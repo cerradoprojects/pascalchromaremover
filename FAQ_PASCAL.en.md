@@ -26,7 +26,7 @@ Windows 10 or 11, 8 GB of memory and about 10 GB free to work. No graphics card 
 
 ## How long does it take?
 
-- **The live frame** shows up in about 30 seconds the first time at each moment of the video (that is the advanced cutout time for that frame). After that, each adjustment shows in 1 to 2 seconds, including the hair cutout ones.
+- **The live frame** first shows, in 2 to 5 seconds, a quick preview (classic cutout) and then swaps it for the frame with the advanced cutout: about 30 seconds on a good computer and a few minutes on a slower one (a seconds counter shows at the top of the video). After that, each adjustment shows in 1 to 2 seconds, including the hair cutout ones.
 - **The 5-second test** takes 1 to 5 minutes.
 - **The full video** with the advanced cutout takes 0.2 to 1 second per frame. A 1-minute video can take 6 to 30 minutes, and a 30-minute one can take several hours. Keep the computer plugged in and with no other heavy programs open.
 
@@ -122,6 +122,16 @@ Yes. Unzip Pascal onto the USB stick and open **Iniciar_Pascal.bat** from there.
 ## Can I process several videos?
 
 One at a time. Choose the video, render, and then choose the next. The settings stay as you left them.
+
+## I chose the video and no frame shows up. What do I do?
+
+1. **Wait a little.** Pascal first shows a quick preview (classic cutout) and then swaps it for the image with the advanced cutout. On slower computers that takes a few minutes; a seconds counter shows at the top of the video.
+2. **Read the red message** in the middle of the video and in step 1 (under the Choose button). It says what happened.
+3. Open **Help & FAQ → Check installation**. Pascal shows what is missing on this computer (a program blocked by Windows, a folder opened from inside the zip, little memory…). Click **Copy report** to send the result to support.
+4. If **Unblock files** shows up, click it: Windows marks everything that comes from a zip as "downloaded from the internet" and sometimes blocks the programs. You can also, before extracting, right-click `Pascal.zip`, choose **Properties** and tick **Unblock**.
+5. Download **`Pascal.zip` from the Releases page** on GitHub. The green *Code → Download ZIP* button only brings the source code, without FFmpeg and Python, and Pascal can't read the video.
+6. Extract the zip before opening it (right-click → **Extract all**) and use Google Chrome or Microsoft Edge.
+7. If the advanced cutout is unavailable (for example, the *Microsoft Visual C++ Redistributable* is missing, which the check points out), Pascal uses the classic cutout by itself and warns you on the video. It works, just with less natural hair.
 
 ## Can I use Pascal in English?
 

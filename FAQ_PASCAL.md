@@ -26,7 +26,7 @@ Windows 10 ou 11, 8 GB de memória e uns 10 GB livres para trabalhar. Não preci
 
 ## Quanto tempo demora?
 
-- **O quadro ao vivo** aparece em cerca de 30 segundos na primeira vez em cada momento do vídeo (é o tempo do recorte avançado daquele quadro). Depois, cada ajuste aparece em 1 a 2 segundos, inclusive os de recorte do cabelo.
+- **O quadro ao vivo** mostra primeiro, em 2 a 5 segundos, uma prévia rápida (recorte clássico) e depois troca pelo quadro com o recorte avançado: cerca de 30 segundos num computador bom e alguns minutos num computador mais lento (um contador de segundos aparece no alto do vídeo). Depois disso, cada ajuste aparece em 1 a 2 segundos, inclusive os de recorte do cabelo.
 - **O teste de 5 segundos** leva de 1 a 5 minutos.
 - **O vídeo completo** com recorte avançado leva de 0,2 a 1 segundo por quadro. Um vídeo de 1 minuto pode levar de 6 a 30 minutos, e um de 30 minutos pode levar várias horas. Deixe o computador ligado na tomada e sem outros programas pesados abertos.
 
@@ -122,6 +122,16 @@ Pode. Descompacte o Pascal no pendrive e abra o **Iniciar_Pascal.bat** de lá. O
 ## Posso processar vários vídeos?
 
 Um de cada vez. Escolha o vídeo, renderize, e depois escolha o próximo. Os ajustes ficam como você deixou.
+
+## Escolhi o vídeo e nenhum quadro aparece. O que faço?
+
+1. **Espere um pouco.** Primeiro o Pascal mostra uma prévia rápida (recorte clássico) e depois a troca pela imagem com o recorte avançado. Em computadores mais lentos isso leva alguns minutos; o contador de segundos aparece no alto do vídeo.
+2. **Leia a mensagem em vermelho** no meio do vídeo e no passo 1 (embaixo do botão Escolher). Ela diz o que aconteceu.
+3. Abra **Ajuda e perguntas → Verificar instalação**. O Pascal mostra o que está faltando neste computador (programa bloqueado pelo Windows, pasta aberta de dentro do zip, pouca memória…). Clique em **Copiar relatório** para mandar o resultado para o suporte.
+4. Se aparecer **Desbloquear arquivos**, clique nele: o Windows marca como "baixado da internet" tudo que vem de um zip e às vezes bloqueia os programas. Você também pode, antes de extrair, clicar com o botão direito no `Pascal.zip`, escolher **Propriedades** e marcar **Desbloquear**.
+5. Baixe o **`Pascal.zip` da página Releases** do GitHub. O botão verde *Code → Download ZIP* só traz o código, sem o FFmpeg e o Python, e o Pascal não consegue ler o vídeo.
+6. Extraia o zip antes de abrir (botão direito → **Extrair tudo**) e use o Google Chrome ou o Microsoft Edge.
+7. Se o recorte avançado estiver indisponível (por exemplo, falta o *Microsoft Visual C++ Redistributable*, que a Verificação indica), o Pascal usa o recorte clássico sozinho e avisa no vídeo. Ele funciona, só com o cabelo menos natural.
 
 ## Posso usar o Pascal em inglês?
 

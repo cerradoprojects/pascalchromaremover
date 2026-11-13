@@ -8,7 +8,6 @@
 (function () {
   const PAIRS = [
     // ---- cabeçalho e passo 1
-    ["Seu vídeo gravado no escritório com cara de estúdio", "Your office-recorded video, with a studio look"],
     ["Pascal, o camaleão", "Pascal, the chameleon"],
     ["◧ Painel", "◧ Panel"],
     ["Esconde ou mostra o painel da esquerda para dar mais espaço ao vídeo", "Hides or shows the left panel to give the video more room"],
@@ -54,8 +53,7 @@
     ["Abrir", "Open"],
     ["Baixar .json", "Download .json"],
     ["Abrir .json", "Open .json"],
-    ["Aplicativos gratuitos criados por um egresso de universidade pública e gratuita de Brasília. Livres para usar, livres para melhorar. Para sempre.", "Free applications brought to life by a Brasília tuition-free public-university alumnus. Free to use, free to improve. Forever."],
-    ["Pascal no GitHub", "Pascal on GitHub"],
+    // (o slogan do topo e a assinatura do rodapé são sempre em inglês: ficam direto no HTML, sem tradução)
     // ---- visualizador
     ["Quadro ao vivo", "Live frame"],
     ["Vídeo de teste", "Test video"],
@@ -269,7 +267,23 @@
     ["Um preview ou render está rodando; o quadro ao vivo volta quando terminar.", "A test or render is running; the live frame comes back when it finishes."],
     ["Não consegui ler o quadro do vídeo.", "Couldn't read the frame from the video."],
     ["A ampliação avançada não está instalada nesta cópia do Pascal. Enquanto isso o Pascal usa o modo Rápido, que já dá um bom resultado.", "Advanced upscaling isn't installed in this copy of Pascal. Meanwhile Pascal uses Fast mode, which already gives a good result."],
-    ["O recorte avançado não está completo nesta cópia do Pascal; usei o recorte clássico (mais rápido, menos natural no cabelo).", "The advanced cutout isn't complete in this copy of Pascal; I used the classic cutout (faster, less natural on the hair)."],
+    ["O PowerShell não está disponível neste computador.", "PowerShell isn't available on this computer."],
+    // ---- verificação da instalação e quadro de prévia
+    ["Verificar instalação", "Check installation"],
+    ["Ver detalhes", "See details"],
+    ["O Pascal encontrou um problema nesta cópia:", "Pascal found a problem with this copy:"],
+    ["Montando a prévia rápida…", "Building the quick preview…"],
+    ["Prévia rápida (recorte clássico). O recorte avançado está em andamento; em computadores mais lentos pode levar alguns minutos.", "Quick preview (classic cutout). The advanced cutout is in progress; on slower computers it can take a few minutes."],
+    ["Dica: em Ajuda e perguntas → Verificar instalação o Pascal mostra o que está faltando neste computador.", "Tip: Help & FAQ → Check installation shows what is missing on this computer."],
+    ["Verificando…", "Checking…"],
+    ["A verificação demorou demais. Tente de novo.", "The check took too long. Try again."],
+    ["Copiar relatório", "Copy report"],
+    ["Relatório copiado.", "Report copied."],
+    ["Selecione o texto abaixo e copie.", "Select the text below and copy it."],
+    ["Verificar de novo", "Check again"],
+    ["Desbloquear arquivos", "Unblock files"],
+    ["Desbloqueando…", "Unblocking…"],
+    ["Relatório em texto", "Report as text"],
     ["ÁUDIO AUSENTE: o arquivo gerado não tem áudio legível.", "AUDIO MISSING: the generated file has no readable audio."],
     ["RUÍDO NÃO REDUZIDO: não achei uma pausa de silêncio de sala neste vídeo/trecho. Escolha um início de teste com uma pausa (ou grave 2 s de silêncio no começo).", "NOISE NOT REDUCED: I couldn't find a pause of room silence in this video/section. Pick a test start with a pause (or record 2 s of silence at the beginning)."],
     ["Não consegui salvar a amostra na pasta de destino (a pasta não aceita gravação).", "Couldn't save the sample to the destination folder (the folder doesn't accept writing)."],
@@ -297,6 +311,14 @@
     [/^Render com ampliação avançada: cerca de ([\d.]+) s por quadro × (\d+) quadros = (.*)\. Continuar\?$/, "Render with advanced upscaling: about $1 s per frame × $2 frames = $3. Continue?"],
     [/^(.*)\n\nVai usar o modo Rápido FFmpeg\.$/, (m, a) => tt(a) + "\n\nIt will use the Fast FFmpeg mode."],
     [/^Erro ao iniciar: (.*)$/, (m, a) => "Error starting: " + tt(a)],
+    [/^([\s\S]*?)\n\n(Dica: em Ajuda e perguntas → Verificar instalação o Pascal mostra o que está faltando neste computador\.)$/, (m, a, b) => tt(a) + "\n\n" + tt(b)],
+    [/^O Windows não abriu a janela de escolha([\s\S]*)$/, "Windows didn't open the chooser window$1"],
+    [/^O recorte avançado não está disponível neste computador; usei o recorte clássico \(mais rápido, menos natural no cabelo\)\. Motivo: ([\s\S]*)$/,
+      (m, r) => "The advanced cutout isn't available on this computer; I used the classic cutout (faster, less natural on hair). Reason: " +
+        r.replace("nenhum Python com numpy + onnxruntime encontrado", "no Python with numpy + onnxruntime found").replace("modelo do RVM ausente em bin\\rvm", "RVM model missing in bin\\rvm")],
+    [/^O recorte avançado não funcionou neste computador; o quadro mostra o recorte clássico\. Motivo: ([\s\S]*)$/,
+      (m, r) => "The advanced cutout didn't work on this computer; the frame shows the classic cutout. Reason: " +
+        r.replace("O recorte avançado do quadro falhou:", "The advanced cutout of the frame failed:").replace("O recorte avançado falhou:", "The advanced cutout failed:")],
     [/^Não consegui usar essa pasta: (.*)$/, "Couldn't use that folder: $1"],
     [/^O FFmpeg não conseguiu montar o quadro: (.*)$/, "FFmpeg couldn't build the frame: $1"],
     // alertas do diagnóstico

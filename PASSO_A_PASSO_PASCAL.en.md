@@ -21,7 +21,8 @@ Pascal takes a video recorded in front of a green screen and delivers the finish
 
 1. Click **Choose…** and select the video.
 2. Under the field you will see the size, the frames per second and the duration. If that shows up, the video was read.
-3. In the right-hand panel, the **Live frame** shows one frame of the video already treated. The first time, Pascal does the advanced cutout of that frame and it takes about 30 seconds. After that, each adjustment shows up right away.
+3. In the right-hand panel, the **Live frame** shows one frame of the video already treated. The first time, a quick preview (classic cutout) shows up right away and, when the advanced cutout finishes, it is swapped for the final image: about 30 seconds on a good computer, a few minutes on a slower one (a seconds counter shows at the top of the video). After that, each adjustment shows up right away.
+4. If nothing shows up or a red message appears, open **Help & FAQ → Check installation**: Pascal shows what is missing on this computer.
 
 ## 3. Look closely
 

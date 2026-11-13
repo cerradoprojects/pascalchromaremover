@@ -4,6 +4,7 @@ Saída: dois arquivos temporários (cor do sujeito já sem verde + transparênci
 Sem o modelo (bin/rvm/*.onnx) ou sem esses pacotes, o programa cai sozinho para o recorte clássico por chroma key."""
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -16,6 +17,11 @@ MODEL_URL = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1
 HOW_TO = (f"Detalhe técnico (só para quem monta a pasta): baixe {MODEL_URL} para bin\\rvm\\ ; o Python precisa de numpy e onnxruntime (python\\Lib\\site-packages).")
 
 _PY_CACHE: dict[str, str | None] = {}
+_PY_ERR = {"msg": ""}          # última linha do erro ao importar numpy/onnxruntime (para dizer o motivo na tela)
+
+
+def last_error() -> str:
+    return _PY_ERR["msg"]
 
 
 def variant_of(s: dict) -> str:
@@ -36,18 +42,29 @@ def find_python(base: Path) -> str | None:
         return _PY_CACHE["py"]
     cands = [str(base / "python" / "python.exe"), sys.executable, shutil.which("python") or "", shutil.which("py") or ""]
     found = None
+    timed_out = False
+    first_err = ""
     for c in cands:
         if not c or not Path(c).exists():
             continue
         cmd = [c, "-3"] if Path(c).stem.lower() == "py" else [c]
         try:
-            r = subprocess.run(cmd + ["-c", "import numpy, onnxruntime"], capture_output=True, timeout=60, creationflags=P.CREATE_NO_WINDOW)
-        except (OSError, subprocess.TimeoutExpired):
+            # na primeira vez o antivírus pode examinar os pacotes por vários segundos: tempo folgado
+            r = subprocess.run(cmd + ["-c", "import numpy, onnxruntime"], capture_output=True, text=True, errors="replace", timeout=240,
+                               creationflags=P.CREATE_NO_WINDOW)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            continue
+        except OSError:
             continue
         if r.returncode == 0:
             found = " ".join(cmd)
             break
-    _PY_CACHE["py"] = found
+        if not first_err:
+            first_err = (r.stderr.strip().splitlines() or [""])[-1][:200]
+    _PY_ERR["msg"] = "" if found else first_err
+    if found or not timed_out:          # demora não é resposta: não guarda "não achei" e tenta de novo no próximo quadro
+        _PY_CACHE["py"] = found
     return found
 
 
@@ -55,7 +72,7 @@ def available(base: Path) -> tuple[bool, str]:
     if find_model(base) is None:
         return False, "modelo do RVM ausente em bin\\rvm. " + HOW_TO
     if find_python(base) is None:
-        return False, "nenhum Python com numpy + onnxruntime encontrado. " + HOW_TO
+        return False, "nenhum Python com numpy + onnxruntime encontrado" + (f" ({last_error()})" if last_error() else "") + ". " + HOW_TO
     return True, ""
 
 
@@ -97,8 +114,15 @@ def generate(ffmpeg: str, base: Path, src: str, s: dict, info: dict, start: floa
             return False, "cancelado", None
     proc.wait()
     if proc.returncode != 0 or not out_c.exists() or not out_a.exists():
-        return False, "O recorte avançado falhou: " + " | ".join(tail[-4:]), None
+        return False, "O recorte avançado falhou: " + error_tail("\n".join(tail)), None
     return True, "", {"color": str(out_c), "alpha": str(out_a), "start": start, "w": tw, "h": th}
+
+
+def error_tail(text: str) -> str:
+    """O erro de verdade do worker: a última linha de erro do Python (as últimas linhas costumam ser só o FFmpeg se despedindo)."""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    errs = [ln for ln in lines if not ln.startswith("[") and re.search(r"(Error|Exception|Traceback|INVALID|[Ff]ail)", ln)]
+    return " | ".join(errs[-2:] or lines[-4:])[:400]
 
 
 def _run_worker(args: list[str], what: str) -> tuple[bool, str]:
@@ -106,8 +130,7 @@ def _run_worker(args: list[str], what: str) -> tuple[bool, str]:
     cmd = py.split() + [str(Path(__file__).with_name("matte_worker.py"))] + args
     r = subprocess.run(cmd, capture_output=True, text=True, errors="replace", creationflags=P.CREATE_NO_WINDOW)
     if r.returncode != 0:
-        tail = " | ".join([ln for ln in (r.stdout + r.stderr).splitlines() if ln.strip()][-4:])
-        return False, f"{what} falhou: {tail}"
+        return False, f"{what} falhou: {error_tail(r.stdout + chr(10) + r.stderr)}"
     return True, ""
 
 

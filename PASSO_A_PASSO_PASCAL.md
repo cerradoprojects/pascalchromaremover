@@ -21,7 +21,8 @@ O Pascal pega o vídeo gravado na frente do fundo verde e entrega o vídeo pront
 
 1. Clique em **Escolher…** e selecione o vídeo.
 2. Abaixo do campo aparecem o tamanho, os quadros por segundo e a duração. Se aparecer isso, o vídeo foi lido.
-3. No painel da direita, o **Quadro ao vivo** mostra um quadro do vídeo já tratado. Na primeira vez, o Pascal faz o recorte avançado desse quadro e leva cerca de 30 segundos. Depois disso, cada ajuste aparece na hora.
+3. No painel da direita, o **Quadro ao vivo** mostra um quadro do vídeo já tratado. Na primeira vez, aparece logo uma prévia rápida (recorte clássico) e, quando o recorte avançado termina, ela é trocada pela imagem final: cerca de 30 segundos num computador bom, alguns minutos num mais lento (um contador de segundos aparece no alto do vídeo). Depois disso, cada ajuste aparece na hora.
+4. Se nada aparecer ou surgir uma mensagem em vermelho, abra **Ajuda e perguntas → Verificar instalação**: o Pascal mostra o que está faltando neste computador.
 
 ## 3. Olhar de perto
 

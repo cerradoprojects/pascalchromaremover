@@ -12,6 +12,10 @@
 > Made by a lousy developer, so you will probably need to improve it.
 > But it's very okay the way it is.
 
+<p align="center">
+  <a href="https://github.com/cerradoprojects/pascalchromaremover/releases/latest/download/Pascal.zip"><b>⬇ Download Pascal.zip</b></a> &nbsp;(Windows 10 / 11, about 250 MB)
+</p>
+
 **Free to use, free to improve. Forever.** ([GPL-3.0](LICENSE))
 
 ---
@@ -37,6 +41,10 @@ You filmed someone in an office, in front of a green sheet, under questionable l
 3. Double-click `Iniciar_Pascal.bat`.
 
 If Windows says it "protected your PC": **More info → Run anyway**. There is no paid signature, no installer, and nothing touches your system.
+
+> **Use the Releases zip, not the green *Code → Download ZIP* button.** That button only gives the source code, without FFmpeg, Python or the cutout model: Pascal opens, but it can't read any video.
+
+**Nothing shows up after choosing the video?** The first frame can take a few minutes on a slow computer (a quick preview appears first, with a seconds counter). If a red message shows up, or nothing happens, open **Help & FAQ → Check installation**: it lists, in plain words, what is missing on that computer (a program blocked by Windows, little memory, a folder opened from inside the zip…), and has a **Copy report** button to paste into an issue.
 
 The user guide is in [`PASSO_A_PASSO_PASCAL.en.md`](PASSO_A_PASSO_PASCAL.en.md) and [`FAQ_PASCAL.en.md`](FAQ_PASCAL.en.md) (Portuguese: [`PASSO_A_PASSO_PASCAL.md`](PASSO_A_PASSO_PASCAL.md), [`FAQ_PASCAL.md`](FAQ_PASCAL.md)). They also open inside the app, under **Help & FAQ**.
 
@@ -93,6 +101,7 @@ Without the model, Pascal still runs and falls back to the classic cutout, telli
 | `matte_worker.py` / `matte_ai.py` | Advanced cutout: model, edge cleanup, temporal guard / launcher |
 | `diag.py` | Automatic diagnosis and alerts |
 | `keepawake.py` | Keeps Windows awake and warns on shutdown while rendering |
+| `selfcheck.py` | **Help & FAQ → Check installation**: says, in plain words, what is missing or blocked on a computer |
 | `ai_render.py` / `upscale_ai.py` | Optional advanced upscaling (Real-ESRGAN, in tiles) |
 | `recorte.py` | Just the cutout, as a function / command line |
 | `web/` | The interface; `web/i18n.js` holds the PT ⇄ EN dictionary |

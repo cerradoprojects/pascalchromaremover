@@ -259,6 +259,7 @@ $("transp").onchange = () => {
 function mmss(t) { const m = Math.floor(t / 60), s = Math.floor(t % 60); return `${m}:${String(s).padStart(2, "0")}`; }
 
 async function loadVideo(path) {
+  $("info").classList.remove("err");
   try {
     const info = await api("/api/probe", { path });
     currentPath = info.path; currentInfo = info;
@@ -279,6 +280,8 @@ async function loadVideo(path) {
   } catch (e) {
     currentPath = ""; currentInfo = null;
     $("info").textContent = e.message;
+    $("info").classList.add("err");
+    showLiveError(e.message);          // o erro também aparece no meio da tela do vídeo, com a dica da verificação
   }
 }
 
@@ -328,17 +331,38 @@ function touch(key, now) {
   live.timer = setTimeout(runLive, now ? 0 : (SLOW_KEYS.has(key) ? 800 : 160));
 }
 
-function setBusy(txt) {
+function setBusy(txt, secs) {
   $("liveBusy").hidden = !txt;
   if (txt) $("liveBusyText").textContent = txt;
+  $("liveBusyTime").textContent = txt && secs >= 4 ? "· " + secs + " s" : "";     // quanto tempo já passou (em PC lento o 1º quadro leva minutos)
 }
 
-async function frameJob(orig) {
+function setNote(text, warn) {
+  const n = $("liveNote");
+  n.hidden = !text;
+  n.textContent = text || "";
+  n.classList.toggle("warn", !!warn);
+}
+
+const INSTALL_HINT = "Dica: em Ajuda e perguntas → Verificar instalação o Pascal mostra o que está faltando neste computador.";
+function showLiveError(msg) {
+  $("liveMsg").hidden = false;
+  $("liveMsg").textContent = "⚠ " + msg + "\n\n" + INSTALL_HINT;
+}
+
+// onQuick: chamado quando a prévia rápida (recorte clássico) fica pronta, enquanto o recorte avançado ainda trabalha
+async function frameJob(orig, onQuick) {
   const r = await api("/api/frame", { path: currentPath, at: live.at, settings, orig, seq: ++live.seq });
+  const t0 = Date.now();
+  let quick = "";
   for (;;) {
     await new Promise((res) => setTimeout(res, 220));
     const j = await api("/api/frame/status?id=" + r.id);
-    if (j.state === "running") { setBusy(j.message); continue; }
+    if (j.state === "running") {
+      if (j.quick && j.quick !== quick && onQuick) { quick = j.quick; onQuick(j); }
+      setBusy(j.message, Math.round((Date.now() - t0) / 1000));
+      continue;
+    }
     return j;
   }
 }
@@ -352,33 +376,40 @@ function loadImg(img, name) {
   });
 }
 
+async function showFrame(name, j) {
+  const pre = await loadImg(imgP, name);
+  const sizeChanged = pre.naturalWidth !== live.w || pre.naturalHeight !== live.h;
+  live.w = pre.naturalWidth; live.h = pre.naturalHeight; live.transparent = !!j.transparent;
+  live.hasProc = true;
+  $("liveMsg").hidden = true;
+  $("pxInfo").textContent = `${live.w}×${live.h} px`;
+  if (live.first || sizeChanged) { live.first = false; fitView(); }
+  applyView();
+  applyBg();
+  vp.classList.add("flash"); setTimeout(() => vp.classList.remove("flash"), 220);
+}
+
 async function runLive() {
   if (!currentPath || $("modeVideo").classList.contains("on")) return;
   if (live.inflight) { live.pending = true; return; }
   live.inflight = true; live.inflightSince = Date.now();
   try {
-    const j = await frameJob(false);
+    const j = await frameJob(false, (q) => {      // prévia rápida: aparece na hora, o recorte avançado vem depois
+      showFrame(q.quick, q).then(() => setNote("Prévia rápida (recorte clássico). O recorte avançado está em andamento; em computadores mais lentos pode levar alguns minutos.", false)).catch(() => {});
+    });
     if (j.state === "done") {
-      const pre = await loadImg(imgP, j.out_name);
-      const sizeChanged = pre.naturalWidth !== live.w || pre.naturalHeight !== live.h;
-      live.w = pre.naturalWidth; live.h = pre.naturalHeight; live.transparent = !!j.transparent;
-      live.hasProc = true;
-      $("liveMsg").hidden = true;
-      $("pxInfo").textContent = `${live.w}×${live.h} px`;
-      if (live.first || sizeChanged) { live.first = false; fitView(); }
-      applyView();
-      applyBg();
-      vp.classList.add("flash"); setTimeout(() => vp.classList.remove("flash"), 220);
+      await showFrame(j.out_name, j);
+      setNote(j.warning || "", !!j.warning);       // aviso, por exemplo: o recorte avançado não está disponível neste computador (e por quê)
     } else if (j.state === "stale") {
       live.pending = true;        // um pedido mais novo tomou o lugar: refaz com os ajustes atuais
     } else if (j.state === "error") {
-      $("liveMsg").hidden = false;
-      $("liveMsg").textContent = "⚠ " + j.error;
+      setNote("");
+      showLiveError(j.error);
     }
     if (live.cmp !== "proc") await ensureOrig();
   } catch (e) {
     if (/rodando/.test(e.message)) { setBusy("Aguardando o teste/render terminar…"); await new Promise((r) => setTimeout(r, 1800)); }
-    else { $("liveMsg").hidden = false; $("liveMsg").textContent = "⚠ " + e.message; }
+    else showLiveError(e.message);
   }
   setBusy("");
   live.inflight = false;
@@ -736,15 +767,96 @@ let currentDoc = "faq";
 async function showDoc(name) {
   currentDoc = name;
   $("docFaq").classList.toggle("on", name === "faq");
-  $("docSteps").classList.toggle("on", name !== "faq");
+  $("docSteps").classList.toggle("on", name === "passo-a-passo");
+  $("docCheck").classList.toggle("on", name === "check");
+  if (name === "check") { showCheck(false); return; }
   $("docBody").textContent = "Carregando…";
   try { $("docBody").innerHTML = mdToHtml(await (await fetch("/doc/" + name + "?lang=" + (window.I18N ? window.I18N.lang : "pt"))).text()); }
   catch (e) { $("docBody").textContent = "Não consegui abrir o texto de ajuda."; }
 }
-window.addEventListener("pascal-lang", () => { if (!$("helpModal").hidden) showDoc(currentDoc); });   // botão PT/EN com a ajuda aberta: troca o texto
+
+// ------------------------------------------------------------------ verificar instalação (o que falta neste computador)
+const curLang = () => (window.I18N ? window.I18N.lang : "pt");
+async function fetchSelfcheck(fresh) {
+  for (let i = 0; i < 100; i++) {
+    const r = await api("/api/selfcheck?lang=" + curLang() + (fresh && i === 0 ? "&fresh=1" : ""));
+    if (!r.pending) return r;
+    await new Promise((res) => setTimeout(res, 1500));
+  }
+  return null;
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch (e) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand("copy"); ta.remove(); return ok;
+    } catch (e2) { return false; }
+  }
+}
+function chkButton(label, fn) { const b = document.createElement("button"); b.className = "soft"; b.textContent = label; b.onclick = fn; return b; }
+async function showCheck(fresh) {
+  const box = $("docBody");
+  box.textContent = T("Verificando…");
+  let r = null;
+  try { r = await fetchSelfcheck(fresh); } catch (e) { box.textContent = T(e.message); return; }
+  if (currentDoc !== "check") return;          // a pessoa já foi para outra aba
+  if (!r) { box.textContent = T("A verificação demorou demais. Tente de novo."); return; }
+  const en = curLang() === "en", c = r.counts;
+  box.innerHTML = "";
+  const h = document.createElement("h1");
+  h.textContent = T("Verificar instalação");
+  const sum = document.createElement("div");
+  sum.className = "chksum";
+  sum.textContent = en ? `${c.ok} ok · ${c.warn} warning(s) · ${c.fail} problem(s) — ${r.when}` : `${c.ok} ok · ${c.warn} atenção · ${c.fail} problema(s) — ${r.when}`;
+  box.append(h, sum);
+  r.items.forEach((it) => {
+    const row = document.createElement("div");
+    row.className = "chk " + it.level;
+    const ic = document.createElement("span"); ic.className = "ic"; ic.textContent = it.level === "ok" ? "✔" : it.level === "warn" ? "⚠" : "✖";
+    const t = document.createElement("span"); t.className = "t"; t.textContent = it.title;
+    row.append(ic, t);
+    if (it.detail) { const d = document.createElement("div"); d.className = "d"; d.textContent = it.detail; row.appendChild(d); }
+    if (it.fix && it.level !== "ok") { const f = document.createElement("div"); f.className = "f"; f.textContent = "→ " + it.fix; row.appendChild(f); }
+    box.appendChild(row);
+  });
+  const bar = document.createElement("div");
+  bar.className = "chkbar";
+  const bCopy = chkButton(T("Copiar relatório"), async () => {
+    const ok = await copyText(r.text);
+    bCopy.textContent = ok ? T("Relatório copiado.") : T("Selecione o texto abaixo e copie.");
+  });
+  bar.append(bCopy, chkButton(T("Verificar de novo"), () => showCheck(true)));
+  if (r.items.some((i) => i.action === "unblock")) {
+    bar.append(chkButton(T("Desbloquear arquivos"), async () => {
+      box.textContent = T("Desbloqueando…");
+      try { await api("/api/unblock", {}); } catch (e) { /* a verificação abaixo mostra o resultado */ }
+      showCheck(true);
+    }));
+  }
+  const det = document.createElement("details");
+  const sm = document.createElement("summary"); sm.textContent = T("Relatório em texto");
+  const pre = document.createElement("pre"); pre.textContent = r.text;
+  det.append(sm, pre);
+  box.append(bar, det);
+}
+// aviso vermelho no alto se a verificação achou um problema que impede o Pascal de trabalhar (ex.: FFmpeg bloqueado ou ausente)
+async function checkInstallBanner() {
+  try {
+    const r = await fetchSelfcheck(false);
+    const bad = r && r.items.find((i) => i.level === "fail");
+    $("alertInstall").hidden = !bad;
+    if (bad) $("alertInstallText").textContent = bad.title + (bad.detail ? " — " + bad.detail : "");
+  } catch (e) { /* sem verificação: a tela segue normal */ }
+}
+$("btnInstallDetails").onclick = () => { $("helpModal").hidden = false; showDoc("check"); };
+window.addEventListener("pascal-lang", () => { if (!$("helpModal").hidden) showDoc(currentDoc); checkInstallBanner(); });   // botão PT/EN: troca o texto da ajuda e do aviso
 $("btnHelp").onclick = () => { $("helpModal").hidden = false; showDoc("faq"); };
 $("docFaq").onclick = () => showDoc("faq");
 $("docSteps").onclick = () => showDoc("passo-a-passo");
+$("docCheck").onclick = () => showDoc("check");
 $("helpClose").onclick = () => { $("helpModal").hidden = true; };
 $("helpModal").onclick = (e) => { if (e.target === $("helpModal")) $("helpModal").hidden = true; };
 
@@ -819,6 +931,7 @@ function buildAiBox(ai) {
   }
   setInterval(() => { api("/api/ping").catch(() => {}); }, 5000);
   api("/api/ping").catch(() => {});
+  checkInstallBanner();
   const q = new URLSearchParams(location.search);   // atalho: abrir com ?v=CAMINHO_DO_VIDEO&at=SEGUNDOS
   if (q.get("at")) live.at = parseFloat(q.get("at")) || live.at;
   if (q.get("v")) loadVideo(q.get("v"));

@@ -33,6 +33,7 @@ import upscale_ai as UA  # noqa: E402
 import ai_render as AR  # noqa: E402
 import matte_ai as MA  # noqa: E402
 import keepawake as KA  # noqa: E402
+import selfcheck as SC  # noqa: E402
 
 WEB = BASE / "web"
 CACHE = BASE / "cache"
@@ -52,6 +53,64 @@ JOBS_LOCK = threading.Lock()
 LAST_PING = {"t": 0.0, "seen": False, "bye": 0.0}
 LAST_VIDEO = {"path": ""}
 PORT = 0
+
+# Tipos de arquivo fixos: o Python no Windows lê o tipo do registro, e em alguns computadores .js/.css vêm como text/plain (a tela não carrega).
+MIME = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".html": "text/html; charset=utf-8", ".png": "image/png",
+        ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".json": "application/json", ".md": "text/markdown; charset=utf-8",
+        ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime"}
+
+
+def mime_of(name: str) -> str:
+    return MIME.get(Path(name).suffix.lower()) or mimetypes.guess_type(name)[0] or "application/octet-stream"
+
+
+def console(msg: str) -> None:
+    """print() que não derruba o programa se a janela preta não aceitar algum acento."""
+    try:
+        print(msg, flush=True)
+    except (UnicodeEncodeError, OSError):
+        try:
+            print(msg.encode("ascii", "replace").decode("ascii"), flush=True)
+        except OSError:
+            pass
+
+
+# verificação da instalação (Ajuda > Verificar instalação): roda uma vez ao abrir, em segundo plano
+SELF: dict = {"result": None, "running": False}
+SELF_LOCK = threading.Lock()
+
+
+def start_selfcheck(fresh: bool = False) -> None:
+    with SELF_LOCK:
+        if SELF["running"] or (SELF["result"] is not None and not fresh):
+            return
+        SELF["running"] = True
+        if fresh:
+            SELF["result"] = None
+
+    def work() -> None:
+        try:
+            res = SC.run(BASE, FFMPEG, FFPROBE, current_out_dir(), find_browser())
+            SELF["result"] = res
+            try:
+                (CACHE / "diagnostico.txt").write_text(SC.report_text(res, "pt") + "\n\n" + SC.report_text(res, "en") + "\n", encoding="utf-8")
+            except OSError:
+                pass
+            c = res["counts"]
+            console(f"Verificação da instalação: {c['ok']} ok, {c['warn']} atenção, {c['fail']} problema(s). Detalhes: Ajuda > Verificar instalação (ou cache\\diagnostico.txt).")
+            for i in res["items"]:
+                if i["level"] != "ok":
+                    console(f"  - {i['pt']['title']}: {i['pt']['detail']}")
+            log("VERIFICAÇÃO\n" + SC.report_text(res, "pt"))
+        except Exception:  # noqa: BLE001
+            log(traceback.format_exc())
+        finally:
+            SELF["running"] = False
+
+    threading.Thread(target=work, daemon=True).start()
+
+
+GPU = {"name": None, "busy": False}      # nome da placa Vulkan: descoberto em segundo plano (rodar o .exe pode demorar ou travar em PCs sem driver)
 
 
 def log(msg: str) -> None:
@@ -123,21 +182,40 @@ def save_sample(out: Path, video: str, dest: Path) -> Path | None:
     return None
 
 
-def pick_folder_dialog(start: str) -> str:
-    """Abre a janela do Windows para escolher uma pasta."""
+def _ps_dialog(script: str) -> str:
+    """Roda um script do PowerShell que abre uma janela do Windows e devolve o que ele escreveu. Se o Windows não abrir a janela, explica por quê."""
+    try:
+        cp = subprocess.run([SC.ps_exe(), "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-Command", script],
+                            capture_output=True, creationflags=P.CREATE_NO_WINDOW, timeout=600)
+    except FileNotFoundError:
+        raise RuntimeError("O PowerShell não está disponível neste computador.") from None
+    out = cp.stdout.decode("utf-8", "replace").strip()
+    if cp.returncode != 0 and not out:
+        err = [ln.strip() for ln in cp.stderr.decode("utf-8", "replace").splitlines() if ln.strip()]
+        raise RuntimeError("O Windows não abriu a janela de escolha" + (": " + err[0][:140] if err else f" (código {cp.returncode})") + ".")
+    return out
+
+
+# O dono invisível "sempre na frente" faz a janela de escolha aparecer na frente do Pascal (sem ele, em alguns computadores ela abre escondida atrás).
+_PS_OWNER = "$o=New-Object System.Windows.Forms.Form -Property @{TopMost=$true;ShowInTaskbar=$false};"
+
+
+def folder_dialog_script(start: str) -> str:
     start = start.replace("'", "''")
-    script = (
+    return (
         "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;"
-        "Add-Type -AssemblyName System.Windows.Forms;"
+        "Add-Type -AssemblyName System.Windows.Forms;" + _PS_OWNER +
         "$d=New-Object System.Windows.Forms.FolderBrowserDialog;"
         "$d.Description='Escolha a pasta onde o Pascal vai salvar os videos prontos';"
         "$d.ShowNewFolderButton=$true;"
         f"$d.SelectedPath='{start}';"
-        "if($d.ShowDialog() -eq 'OK'){Write-Output $d.SelectedPath}"
+        "if($d.ShowDialog($o) -eq 'OK'){Write-Output $d.SelectedPath}"
     )
-    cp = subprocess.run(["powershell", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-Command", script],
-                        capture_output=True, creationflags=P.CREATE_NO_WINDOW, timeout=600)
-    return cp.stdout.decode("utf-8", "replace").strip()
+
+
+def pick_folder_dialog(start: str) -> str:
+    """Abre a janela do Windows para escolher uma pasta."""
+    return _ps_dialog(folder_dialog_script(start))
 
 
 def safe_name(name: str) -> str:
@@ -145,20 +223,21 @@ def safe_name(name: str) -> str:
     return name or "meu_preset"
 
 
-def pick_file_dialog() -> str:
-    """Abre a janela do Windows para escolher o vídeo (via PowerShell, que já vem no Windows)."""
-    script = (
+def file_dialog_script() -> str:
+    return (
         "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;"
-        "Add-Type -AssemblyName System.Windows.Forms;"
+        "Add-Type -AssemblyName System.Windows.Forms;" + _PS_OWNER +
         "$d=New-Object System.Windows.Forms.OpenFileDialog;"
         "$d.Title='Escolha o video bruto';"
         "$d.Filter='Videos|*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v;*.mxf;*.mts|Todos os arquivos|*.*';"
-        f"$d.InitialDirectory='{str(INPUT)}';"
-        "if($d.ShowDialog() -eq 'OK'){Write-Output $d.FileName}"
+        f"$d.InitialDirectory='{str(INPUT).replace(chr(39), chr(39) * 2)}';"
+        "if($d.ShowDialog($o) -eq 'OK'){Write-Output $d.FileName}"
     )
-    cp = subprocess.run(["powershell", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-Command", script],
-                        capture_output=True, creationflags=P.CREATE_NO_WINDOW, timeout=600)
-    return cp.stdout.decode("utf-8", "replace").strip()
+
+
+def pick_file_dialog() -> str:
+    """Abre a janela do Windows para escolher o vídeo (via PowerShell, que já vem no Windows)."""
+    return _ps_dialog(file_dialog_script())
 
 
 # ---------------------------------------------------------------- trabalhos
@@ -250,7 +329,8 @@ def use_matte(s: dict) -> tuple[bool, str]:
     ok, why = MA.available(BASE)
     if not ok:
         log("Recorte avançado indisponível: " + why)
-    return ok, ("" if ok else "O recorte avançado não está completo nesta cópia do Pascal; usei o recorte clássico (mais rápido, menos natural no cabelo).")
+    short = why.split(". Detalhe")[0].strip()
+    return ok, ("" if ok else "O recorte avançado não está disponível neste computador; usei o recorte clássico (mais rápido, menos natural no cabelo). Motivo: " + short)
 
 
 def run_matte_stage(job: dict, path: str, s: dict, info: dict, start: float, length: float):
@@ -360,8 +440,18 @@ def start_preview(path: str, raw: dict) -> dict:
 
 def ai_info() -> dict:
     exe = UA.find_exe(BASE)
+    if exe and GPU["name"] is None and not GPU["busy"]:       # nunca bloqueia a tela: a 1ª resposta vem sem o nome da placa
+        GPU["busy"] = True
+
+        def probe() -> None:
+            try:
+                GPU["name"] = UA.gpu_name(exe)
+            finally:
+                GPU["busy"] = False
+
+        threading.Thread(target=probe, daemon=True).start()
     return {"available": bool(exe), "models": UA.list_models(exe) if exe else [], "howto": UA.HOW_TO, "url": UA.DOWNLOAD_URL,
-            "gpu": UA.gpu_name(exe) if exe else "", "model_info": {k: v[0] for k, v in UA.MODEL_INFO.items()}}
+            "gpu": GPU["name"] or "", "model_info": {k: v[0] for k, v in UA.MODEL_INFO.items()}}
 
 
 def ai_sec_per_frame(path: str, s: dict) -> float:
@@ -543,53 +633,79 @@ def start_frame(path: str, at: float, raw: dict, orig: bool, seq: int) -> dict:
                     if cp.returncode != 0 or not out.exists():
                         raise RuntimeError("Não consegui ler o quadro do vídeo.")
                 else:
+                    transparent = P.output_kind(s) != "mp4" and s["mod_chroma"]
+
+                    def compose(matte_arg, dest: Path) -> None:
+                        """Cor, luz e fundo sobre o recorte dado (matte_arg=None: recorte clássico por chroma key)."""
+                        s2 = dict(s)
+                        ck = (path, round(at_c, 2), s["chroma_color"])
+                        sub = SUBJ_CACHE.get(ck)
+                        if sub is None:
+                            s2 = P.resolve_key_color(FFMPEG, path, s2, info, at_c)
+                            sub = {"color": s2["chroma_color"], "subject": P.analyze_subject(FFMPEG, path, at_c, s2["chroma_color"] if s2["chroma_color"] != "auto" else "#95e591")}
+                            SUBJ_CACHE[ck] = sub
+                        s2["chroma_color"] = sub["color"]
+                        s2["_subject"] = sub["subject"]
+                        cmd, _ = P.build_still_command(FFMPEG, path, s2, info, str(dest), at_c, matte=matte_arg, ready=True)
+                        cp = subprocess.run(cmd, capture_output=True, text=True, errors="replace", creationflags=P.CREATE_NO_WINDOW)
+                        if cp.returncode != 0 or not dest.exists():
+                            log("ERRO quadro: " + cp.stderr[-600:])
+                            raise RuntimeError("O FFmpeg não conseguiu montar o quadro: " + (cp.stderr.strip().splitlines() or ["erro"])[-1])
+
                     matte = None
                     matte_on, why = use_matte(s)
+                    if why:
+                        job["warning"] = why
                     if matte_on:
                         rkey = (path, round(at_c, 2), tw, th)
                         key = rkey + (round(float(s["matte_mix"]), 2), round(float(s["matte_spill"]), 2), s["matte_style"])
                         matte = MATTE_CACHE.get(key)
                         if matte is None or not Path(matte["color"]).exists():
-                            # 1) o modelo roda UMA vez por quadro (~30 s); 2) a borda (mistura de cor, tira-verde) é refeita em ~1,5 s a cada ajuste
-                            raw_npz = RAW_CACHE.get(rkey)
-                            if raw_npz is None or not Path(raw_npz).exists():
-                                job["message"] = "Recortando este quadro… (cerca de 30 s; depois os ajustes são instantâneos)"
-                                ok, msg, raw_npz = MA.generate_raw(FFMPEG, BASE, path, s, info, at_c, CACHE / ("fr_" + secrets.token_hex(3)))
+                            matte = None
+                            quick = CACHE / f"frame_{job['id']}_q.png"
+                            try:
+                                # prévia rápida (recorte clássico, ~2 s): aparece na hora enquanto o recorte avançado trabalha (em PC lento leva minutos)
+                                job["message"] = "Montando a prévia rápida…"
+                                compose(None, quick)
+                                job.update(quick=quick.name, transparent=transparent, width=tw, height=th, at=at_c)
+                            except Exception as e:  # noqa: BLE001
+                                log("prévia rápida falhou: " + str(e))
+                            try:
+                                # 1) o modelo roda UMA vez por quadro (~30 s); 2) a borda (mistura de cor, tira-verde) é refeita em ~1,5 s a cada ajuste
+                                raw_npz = RAW_CACHE.get(rkey)
+                                if raw_npz is None or not Path(raw_npz).exists():
+                                    job["message"] = "Recortando este quadro… (cerca de 30 s; depois os ajustes são instantâneos)"
+                                    ok, msg, raw_npz = MA.generate_raw(FFMPEG, BASE, path, s, info, at_c, CACHE / ("fr_" + secrets.token_hex(3)))
+                                    if ok:
+                                        RAW_CACHE[rkey] = raw_npz
+                                        while len(RAW_CACHE) > 3:
+                                            shutil.rmtree(Path(RAW_CACHE.pop(next(iter(RAW_CACHE)))).parent, ignore_errors=True)
+                                else:
+                                    ok, msg = True, ""
                                 if ok:
-                                    RAW_CACHE[rkey] = raw_npz
-                                    while len(RAW_CACHE) > 3:
-                                        shutil.rmtree(Path(RAW_CACHE.pop(next(iter(RAW_CACHE)))).parent, ignore_errors=True)
-                            else:
-                                ok, msg = True, ""
-                            if ok:
-                                job["message"] = "Refazendo a borda do recorte…"
-                                ok, msg, matte = MA.post_raw(FFMPEG, raw_npz, s, info, Path(raw_npz).parent / ("post_" + secrets.token_hex(2)))
-                            if not ok:        # plano B: o caminho antigo (um passo só, ~30 s)
-                                log("quadro ao vivo: caminho rápido falhou (" + msg + "); usando o completo")
-                                job["message"] = "Recortando este quadro… (cerca de 30 s)"
-                                work_dir = CACHE / ("fm_" + secrets.token_hex(3))
-                                ok, msg, matte = MA.generate(FFMPEG, BASE, path, s, info, at_c, 1.0 / max(1.0, info["fps"]), work_dir, None, None, lambda: False, log)
-                                if not ok:
-                                    raise RuntimeError(msg)
-                            MATTE_CACHE[key] = matte
-                            while len(MATTE_CACHE) > 6:
-                                k0 = next(iter(MATTE_CACHE))
-                                shutil.rmtree(Path(MATTE_CACHE.pop(k0)["color"]).parent, ignore_errors=True)
+                                    job["message"] = "Refazendo a borda do recorte…"
+                                    ok, msg, matte = MA.post_raw(FFMPEG, raw_npz, s, info, Path(raw_npz).parent / ("post_" + secrets.token_hex(2)))
+                                if not ok:        # plano B: o caminho antigo (um passo só, ~30 s)
+                                    log("quadro ao vivo: caminho rápido falhou (" + msg + "); usando o completo")
+                                    job["message"] = "Recortando este quadro… (cerca de 30 s)"
+                                    work_dir = CACHE / ("fm_" + secrets.token_hex(3))
+                                    ok, msg, matte = MA.generate(FFMPEG, BASE, path, s, info, at_c, 1.0 / max(1.0, info["fps"]), work_dir, None, None, lambda: False, log)
+                                    if not ok:
+                                        raise RuntimeError(msg)
+                                MATTE_CACHE[key] = matte
+                                while len(MATTE_CACHE) > 6:
+                                    k0 = next(iter(MATTE_CACHE))
+                                    shutil.rmtree(Path(MATTE_CACHE.pop(k0)["color"]).parent, ignore_errors=True)
+                            except Exception as e:  # noqa: BLE001
+                                # o recorte avançado falhou neste computador: o quadro fica com o recorte clássico (a prévia) e um aviso com o motivo
+                                log("recorte avançado do quadro falhou: " + str(e))
+                                matte = None
+                                job["warning"] = "O recorte avançado não funcionou neste computador; o quadro mostra o recorte clássico. Motivo: " + str(e)[:300]
                     job["message"] = "Aplicando cor, luz e fundo…"
-                    s2 = dict(s)
-                    ck = (path, round(at_c, 2), s["chroma_color"])
-                    sub = SUBJ_CACHE.get(ck)
-                    if sub is None:
-                        s2 = P.resolve_key_color(FFMPEG, path, s2, info, at_c)
-                        sub = {"color": s2["chroma_color"], "subject": P.analyze_subject(FFMPEG, path, at_c, s2["chroma_color"] if s2["chroma_color"] != "auto" else "#95e591")}
-                        SUBJ_CACHE[ck] = sub
-                    s2["chroma_color"] = sub["color"]
-                    s2["_subject"] = sub["subject"]
-                    cmd, _ = P.build_still_command(FFMPEG, path, s2, info, str(out), at_c, matte=matte, ready=True)
-                    cp = subprocess.run(cmd, capture_output=True, text=True, errors="replace", creationflags=P.CREATE_NO_WINDOW)
-                    if cp.returncode != 0 or not out.exists():
-                        log("ERRO quadro: " + cp.stderr[-600:])
-                        raise RuntimeError("O FFmpeg não conseguiu montar o quadro: " + (cp.stderr.strip().splitlines() or ["erro"])[-1])
+                    if matte is None and job.get("quick") and (CACHE / job["quick"]).exists():
+                        shutil.copyfile(CACHE / job["quick"], out)         # a prévia rápida já é o quadro final (recorte clássico)
+                    else:
+                        compose(matte, out)
                 job.update(state="done", message="Pronto", out_name=out.name, transparent=P.output_kind(s) != "mp4" and not orig and s["mod_chroma"],
                            width=tw, height=th, at=at_c)
         except Exception as e:  # noqa: BLE001
@@ -647,7 +763,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         size = path.stat().st_size
-        ctype = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+        ctype = mime_of(str(path))
         start, end = 0, size - 1
         status = 200
         rng = self.headers.get("Range")
@@ -709,7 +825,7 @@ class Handler(BaseHTTPRequestHandler):
                 html = (WEB / "index.html").read_text(encoding="utf-8").replace("__TOKEN__", TOKEN)
                 self._send_bytes(html.encode("utf-8"), "text/html; charset=utf-8")
             elif route in ("/app.js", "/i18n.js", "/style.css", "/pascal.png", "/pascal-icon.png"):
-                self._send_bytes((WEB / route[1:]).read_bytes(), mimetypes.guess_type(route)[0] or "text/plain")
+                self._send_bytes((WEB / route[1:]).read_bytes(), mime_of(route))
             elif route.startswith("/doc/"):
                 name = Path(route[len("/doc/"):]).name
                 docs = {"faq": "FAQ_PASCAL", "passo-a-passo": "PASSO_A_PASSO_PASCAL"}
@@ -747,6 +863,15 @@ class Handler(BaseHTTPRequestHandler):
                 "user_presets": sorted(p.stem for p in USER_PRESETS.glob("*.json")),
                 "ai": ai_info(), "keep_awake": dict(KA.STATE),
             })
+        elif route == "/api/selfcheck":      # Ajuda > Verificar instalação (?fresh=1 refaz; ?lang=en em inglês)
+            lang = "en" if q.get("lang", ["pt"])[0] == "en" else "pt"
+            start_selfcheck(q.get("fresh", ["0"])[0] == "1")
+            res = SELF["result"]
+            if res is None:
+                self._json({"pending": True})
+            else:
+                self._json({"counts": res["counts"], "when": res["when"], "text": SC.report_text(res, lang),
+                            "items": [{"level": i["level"], "action": i["action"], **i[lang]} for i in res["items"]]})
         elif route == "/api/ping":
             LAST_PING.update(t=time.time(), seen=True)
             self._json({"ok": True})
@@ -918,6 +1043,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             job = start_frame(path, float(data.get("at", 0) or 0), data.get("settings", {}), bool(data.get("orig")), int(data.get("seq", 0) or 0))
             self._json({"id": job["id"]})
+        elif route == "/api/unblock":        # tira a marca de "baixado da internet" dos arquivos do Pascal e verifica de novo
+            ok, msg = SC.unblock(BASE)
+            start_selfcheck(True)
+            self._json({"ok": ok, "message": msg})
         elif route == "/api/quit":
             self._json({"ok": True})
             threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0)), daemon=True).start()
@@ -992,6 +1121,7 @@ def main() -> None:
     print(f"Pascal rodando em {url}")
     print("FFmpeg:", FFMPEG or "NÃO ENCONTRADO (coloque ffmpeg.exe e ffprobe.exe na pasta bin)")
     print("Pode fechar esta janela preta depois de fechar o aplicativo.")
+    start_selfcheck(True)                 # confere a instalação em segundo plano (resultado na janela preta e em Ajuda > Verificar instalação)
     threading.Thread(target=watchdog, daemon=True).start()
     threading.Thread(target=KA.loop, args=(any_running, log), name="keepawake", daemon=True).start()   # sem repouso/desligamento durante o render
     if "--sem-janela" not in sys.argv:

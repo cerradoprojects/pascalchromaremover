@@ -13,7 +13,7 @@
   <img class="logo" src="/pascal.png" alt="Pascal, o camaleão">
   <div class="brand">
     <h1>Pascal</h1>
-    <span class="sub">Seu vídeo gravado no escritório com cara de estúdio</span>
+    <span class="sub" lang="en">High hopes, empty pockets, terrible lighting.... Turning "tragic" into "almost OK"</span>
   </div>
   <div class="hdr-actions">
     <button id="btnAside" class="ghost" title="Esconde ou mostra o painel da esquerda para dar mais espaço ao vídeo">◧ Painel</button>
@@ -25,6 +25,10 @@
 
 <div id="alertFfmpeg" class="alert" hidden data-en="<b>FFmpeg not found.</b> Put <code>ffmpeg.exe</code> and <code>ffprobe.exe</code> inside Pascal's <code>bin</code> folder and open it again.">
   <b>FFmpeg não encontrado.</b> Coloque <code>ffmpeg.exe</code> e <code>ffprobe.exe</code> dentro da pasta <code>bin</code> do Pascal e abra de novo.
+</div>
+
+<div id="alertInstall" class="alert" hidden>
+  <b>O Pascal encontrou um problema nesta cópia:</b> <span id="alertInstallText"></span> <button id="btnInstallDetails" class="small">Ver detalhes</button>
 </div>
 
 <main>
@@ -83,9 +87,9 @@
       <div class="row"><button id="btnExport" class="ghost">Baixar .json</button><label class="filebtn ghost">Abrir .json<input id="fileImport" type="file" accept=".json" hidden></label></div>
     </details>
 
-    <footer class="about">
-      <p>Aplicativos gratuitos criados por um egresso de universidade pública e gratuita de Brasília. Livres para usar, livres para melhorar. Para sempre.</p>
-      <p><a href="https://github.com/cerradoprojects/pascalchromaremover" target="_blank" rel="noopener noreferrer" title="https://github.com/cerradoprojects/pascalchromaremover">Pascal no GitHub</a> · <a href="https://github.com/cerradoprojects" target="_blank" rel="noopener noreferrer" title="https://github.com/cerradoprojects">Cerrado Projects</a></p>
+    <footer class="about" lang="en">
+      <p>Free applications brought to life by a Brasília tuition-free public-university alumnus. Free to use, free to improve. Forever.</p>
+      <p><a href="https://github.com/cerradoprojects/pascalchromaremover" target="_blank" rel="noopener noreferrer" title="https://github.com/cerradoprojects/pascalchromaremover">Pascal on GitHub</a> · <a href="https://github.com/cerradoprojects" target="_blank" rel="noopener noreferrer" title="https://github.com/cerradoprojects">Cerrado Projects</a></p>
     </footer>
   </aside>
 
@@ -135,7 +139,8 @@
           <div id="splitLine" hidden><span></span></div>
           <div id="splitTagL" class="splittag" hidden>Original</div><div id="splitTagR" class="splittag" hidden>Pascal</div>
           <div id="liveMsg" class="livemsg">Escolha um vídeo para ver o quadro aqui.</div>
-          <div id="liveBusy" class="livebusy" hidden><i></i><span id="liveBusyText">Atualizando…</span></div>
+          <div id="liveNote" class="livenote" hidden></div>
+          <div id="liveBusy" class="livebusy" hidden><i></i><span id="liveBusyText">Atualizando…</span><span id="liveBusyTime" class="muted"></span></div>
           <div id="zoomHint" class="zoomhint">Role o mouse para dar zoom · arraste para mover</div>
         </div>
         <div class="tl">
@@ -173,7 +178,7 @@
 <div id="helpModal" class="modal" hidden>
   <div class="sheet">
     <div class="sheet-top">
-      <div class="seg"><button id="docFaq" class="on">Perguntas frequentes</button><button id="docSteps">Passo a passo</button></div>
+      <div class="seg"><button id="docFaq" class="on">Perguntas frequentes</button><button id="docSteps">Passo a passo</button><button id="docCheck">Verificar instalação</button></div>
       <button id="helpClose" class="ghost">Fechar ✕</button>
     </div>
     <div id="docBody" class="doc">Carregando…</div>
