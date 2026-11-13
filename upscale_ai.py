@@ -32,11 +32,17 @@ MODEL_INFO = {
 }
 
 
+def vulkan_ok() -> bool:
+    """O driver de vídeo trouxe o Vulkan (vulkan-1.dll)? Sem ele o .exe nem abre (e o Windows mostraria um erro de sistema)."""
+    root = os.environ.get("SystemRoot") or os.environ.get("windir") or r"C:\Windows"
+    return os.name != "nt" or (Path(root) / "System32" / "vulkan-1.dll").is_file()
+
+
 def find_exe(base: Path) -> Path | None:
-    """Procura realesrgan-ncnn-vulkan.exe em ./bin (inclusive subpastas)."""
+    """Procura realesrgan-ncnn-vulkan.exe em ./bin (inclusive subpastas). Sem Vulkan neste computador, devolve None (cai no modo Rápido)."""
     names = ("realesrgan-ncnn-vulkan.exe", "realesrgan-ncnn-vulkan")
     bin_dir = base / "bin"
-    if not bin_dir.is_dir():
+    if not bin_dir.is_dir() or not vulkan_ok():
         return None
     for n in names:
         p = bin_dir / n

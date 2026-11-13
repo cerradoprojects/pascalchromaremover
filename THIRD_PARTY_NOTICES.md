@@ -14,6 +14,7 @@ Where a license requires it, the place to get the corresponding source code is g
 | **ONNX Runtime** | `python\Lib\site-packages\onnxruntime` | MIT (license and third-party notices in the package's `*.dist-info`) | https://github.com/microsoft/onnxruntime |
 | ONNX Runtime's own dependencies: **flatbuffers**, **protobuf**, **packaging** | `python\Lib\site-packages` | Apache-2.0 (flatbuffers), BSD-3-Clause (protobuf), Apache-2.0 or BSD-2-Clause (packaging); each package keeps its license in its `*.dist-info` | https://pypi.org/project/flatbuffers/ — https://pypi.org/project/protobuf/ — https://pypi.org/project/packaging/ |
 | `vcomp140.dll`, `vcomp140d.dll` (Microsoft Visual C++ OpenMP runtime, needed by the Real-ESRGAN program) | `bin\realesrgan\` | Microsoft redistributable | https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files |
+| **Microsoft Visual C++ runtime** (`msvcp140.dll`, `msvcp140_1.dll`, `msvcp140_2.dll`, `msvcp140_atomic_wait.dll`, `msvcp140_codecvt_ids.dll`, `concrt140.dll`, `vcruntime140.dll`, `vcruntime140_1.dll`), included next to `python.exe` so ONNX Runtime works on computers that don't have the Visual C++ Redistributable and where no administrator can install it | `python\` | Microsoft redistributable ("app-local deployment" of the Visual C++ runtime, per Microsoft's Visual Studio redistribution terms) | https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files |
 
 If you want to rebuild Pascal from source, the README explains where to download each piece.
 

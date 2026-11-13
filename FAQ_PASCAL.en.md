@@ -131,7 +131,11 @@ One at a time. Choose the video, render, and then choose the next. The settings 
 4. If **Unblock files** shows up, click it: Windows marks everything that comes from a zip as "downloaded from the internet" and sometimes blocks the programs. You can also, before extracting, right-click `Pascal.zip`, choose **Properties** and tick **Unblock**.
 5. Download **`Pascal.zip` from the Releases page** on GitHub. The green *Code → Download ZIP* button only brings the source code, without FFmpeg and Python, and Pascal can't read the video.
 6. Extract the zip before opening it (right-click → **Extract all**) and use Google Chrome or Microsoft Edge.
-7. If the advanced cutout is unavailable (for example, the *Microsoft Visual C++ Redistributable* is missing, which the check points out), Pascal uses the classic cutout by itself and warns you on the video. It works, just with less natural hair.
+7. If the advanced cutout is unavailable, Pascal uses the classic cutout by itself and warns you on the video, with the reason. It works, just with less natural hair.
+
+## Do I need to install C++ or be an administrator?
+
+No. From version 1.0.2 on, Pascal carries the Microsoft Visual C++ files that the advanced cutout needs inside its own folder, and it runs on a regular login, without administrator rights. If you use an older version and the computer doesn't have C++, download the latest `Pascal.zip`.
 
 ## Can I use Pascal in English?
 

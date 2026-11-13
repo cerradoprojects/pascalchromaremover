@@ -8,6 +8,7 @@ Toda a parte de filtros do FFmpeg está em pipeline.py.
 """
 from __future__ import annotations
 
+import ctypes
 import json
 import mimetypes
 import os
@@ -24,6 +25,12 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
+
+if os.name == "nt":
+    try:    # programa que não consegue abrir (falta uma DLL, por exemplo) não mostra a janela de erro do Windows: o erro volta para o Pascal, que explica
+        ctypes.windll.kernel32.SetErrorMode(0x0001 | 0x0002 | 0x8000)       # FAILCRITICALERRORS | NOGPFAULTERRORBOX | NOOPENFILEERRORBOX (os programas filhos herdam)
+    except (AttributeError, OSError):
+        pass
 
 BASE = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE))
@@ -326,7 +333,10 @@ def use_matte(s: dict) -> tuple[bool, str]:
     """Recorte avançado (RVM)? Se faltar o modelo/pacotes, volta sozinho ao chroma key e devolve o motivo."""
     if not (s["mod_chroma"] and s["matte_engine"] == "rvm"):
         return False, ""
-    ok, why = MA.available(BASE)
+    try:
+        ok, why = MA.available(BASE)
+    except Exception as e:  # noqa: BLE001      # nada na procura do Python pode derrubar o quadro: sem o recorte avançado, o clássico assume
+        ok, why = False, f"erro ao verificar o recorte avançado ({str(e)[:160]})"
     if not ok:
         log("Recorte avançado indisponível: " + why)
     short = why.split(". Detalhe")[0].strip()
@@ -440,6 +450,9 @@ def start_preview(path: str, raw: dict) -> dict:
 
 def ai_info() -> dict:
     exe = UA.find_exe(BASE)
+    howto = UA.HOW_TO
+    if exe is None and not UA.vulkan_ok() and any((BASE / "bin").rglob("realesrgan-ncnn-vulkan.exe")):
+        howto = "Este computador não tem o driver de vídeo com Vulkan (o arquivo vulkan-1.dll); a ampliação avançada não funciona aqui. O modo Rápido funciona normalmente."
     if exe and GPU["name"] is None and not GPU["busy"]:       # nunca bloqueia a tela: a 1ª resposta vem sem o nome da placa
         GPU["busy"] = True
 
@@ -450,7 +463,7 @@ def ai_info() -> dict:
                 GPU["busy"] = False
 
         threading.Thread(target=probe, daemon=True).start()
-    return {"available": bool(exe), "models": UA.list_models(exe) if exe else [], "howto": UA.HOW_TO, "url": UA.DOWNLOAD_URL,
+    return {"available": bool(exe), "models": UA.list_models(exe) if exe else [], "howto": howto, "url": UA.DOWNLOAD_URL,
             "gpu": GPU["name"] or "", "model_info": {k: v[0] for k, v in UA.MODEL_INFO.items()}}
 
 
@@ -927,13 +940,27 @@ class Handler(BaseHTTPRequestHandler):
             p = INPUT / raw
         return str(p) if p.is_file() else None
 
+    def _why_missing(self, data: dict) -> str:
+        """Por que o vídeo não abriu: não existe, ou este login do Windows não tem permissão para ele (outra pessoa/outro usuário)."""
+        raw = str(data.get("path", "")).strip().strip('"')
+        if raw:
+            try:
+                os.stat(raw)
+                if not Path(raw).is_file():
+                    return "Isso não é um arquivo de vídeo. Escolha o arquivo do vídeo."
+            except PermissionError:
+                return "O Windows não deixa este login abrir esse arquivo (sem permissão). Copie o vídeo para uma pasta sua, como Documentos ou a Área de Trabalho, e escolha de novo."
+            except OSError:
+                pass
+        return "Arquivo não encontrado. Confira o caminho."
+
     def api_post(self, route: str, data: dict) -> None:
         if route == "/api/browse":
             self._json({"path": pick_file_dialog()})
         elif route == "/api/probe":
             path = self._resolve_input(data)
             if not path:
-                self._err("Arquivo não encontrado. Confira o caminho.")
+                self._err(self._why_missing(data))
                 return
             if not FFPROBE:
                 self._err("ffprobe.exe não encontrado na pasta bin.")

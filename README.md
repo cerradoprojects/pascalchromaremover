@@ -90,6 +90,8 @@ Pascal\
 
 Without the model, Pascal still runs and falls back to the classic cutout, telling you so on screen.
 
+**No Visual C++ Redistributable, no admin rights?** ONNX Runtime needs the Microsoft Visual C++ runtime. The release zip already carries it next to `python.exe` ("app-local deployment"). When building your own folder, copy `msvcp140.dll`, `msvcp140_1.dll`, `msvcp140_2.dll`, `msvcp140_atomic_wait.dll`, `msvcp140_codecvt_ids.dll`, `concrt140.dll`, `vcruntime140.dll` and `vcruntime140_1.dll` from `C:\Windows\System32` into `python\`.
+
 **Make the release zip:** `tools\make_zip.ps1` (PowerShell) builds `Pascal.zip` next to the folder, without logs, caches or personal settings.
 
 ## Project map

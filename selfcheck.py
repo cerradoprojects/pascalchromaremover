@@ -135,18 +135,43 @@ def run(base: Path, ffmpeg: str | None, ffprobe: str | None, out_dir: Path, brow
             else:
                 err = (r.stderr.strip().splitlines() or ["?"])[-1][:200]
                 need_vc = any(k in err.upper() for k in ("DLL", "MSVCP", "VCRUNTIME", "ONNXRUNTIME_PYBIND"))
-                fix_pt = (f"Instale o \"Microsoft Visual C++ Redistributable\" (64 bits) em {VC_URL} e abra o Pascal de novo. " if need_vc else "") \
-                    + "Enquanto isso o Pascal usa o recorte clássico (mais rápido, menos natural no cabelo)."
-                fix_en = (f"Install the \"Microsoft Visual C++ Redistributable\" (64-bit) from {VC_URL} and open Pascal again. " if need_vc else "") \
-                    + "Meanwhile Pascal uses the classic cutout (faster, less natural on hair)."
-                items.append(_item("warn", ("Recorte avançado indisponível neste computador", err, fix_pt),
-                                   ("Advanced cutout unavailable on this computer", err, fix_en)))
+                local_vc = (base / "python" / "msvcp140.dll").is_file()
+                act = ""
+                if need_vc and local_vc:      # os arquivos do C++ já estão na pasta: então é o Windows/antivírus que impede o carregamento
+                    pre_pt = "Os arquivos do C++ já vão dentro do Pascal, então algo no Windows (antivírus ou bloqueio de segurança) está impedindo o carregamento. Clique em Desbloquear arquivos ou libere a pasta do Pascal no antivírus. "
+                    pre_en = "The C++ files already ship inside Pascal, so something in Windows (antivirus or a security block) is preventing them from loading. Click Unblock files or allow Pascal's folder in your antivirus. "
+                    act = "unblock"
+                elif need_vc:
+                    pre_pt = f"Extraia de novo o Pascal.zip mais recente (ele já leva os arquivos do C++) ou peça a quem administra o computador para instalar o \"Microsoft Visual C++ Redistributable\" (64 bits): {VC_URL} . "
+                    pre_en = f"Extract the latest Pascal.zip again (it already carries the C++ files) or ask whoever administers the computer to install the \"Microsoft Visual C++ Redistributable\" (64-bit): {VC_URL} . "
+                else:
+                    pre_pt = pre_en = ""
+                items.append(_item("warn", ("Recorte avançado indisponível neste computador", err, pre_pt + "Enquanto isso o Pascal usa o recorte clássico (mais rápido, menos natural no cabelo)."),
+                                   ("Advanced cutout unavailable on this computer", err, pre_en + "Meanwhile Pascal uses the classic cutout (faster, less natural on hair)."), act))
         except subprocess.TimeoutExpired:
             items.append(_item("warn", ("O recorte avançado demorou demais para iniciar", "Mais de 2 minutos para carregar os pacotes (antivírus examinando?).", "Tente de novo em alguns minutos."),
                                ("The advanced cutout took too long to start", "More than 2 minutes to load the packages (antivirus scanning?).", "Try again in a few minutes.")))
         except OSError as e:
             items.append(_item("warn", ("Não consegui testar o recorte avançado", str(e)[:160], "O Pascal usa o recorte clássico."),
                                ("Couldn't test the advanced cutout", str(e)[:160], "Pascal uses the classic cutout.")))
+
+    # arquivos do C++ (Visual C++) e do Vulkan: o recorte avançado precisa do primeiro; a ampliação avançada, do segundo
+    sysroot = os.environ.get("SystemRoot") or os.environ.get("windir") or r"C:\Windows"
+    if (base / "python" / "msvcp140.dll").is_file():
+        items.append(_item("ok", ("Arquivos do C++ (Visual C++)", "Já vão dentro do Pascal (pasta python): não precisa instalar nada."),
+                           ("C++ files (Visual C++)", "They already ship inside Pascal (python folder): nothing to install.")))
+    elif (Path(sysroot) / "System32" / "msvcp140.dll").is_file():
+        items.append(_item("ok", ("Arquivos do C++ (Visual C++)", "Instalados no Windows."), ("C++ files (Visual C++)", "Installed in Windows.")))
+    else:
+        items.append(_item("warn", ("Faltam os arquivos do C++ (Visual C++)", "O recorte avançado precisa deles (msvcp140.dll).",
+                                    "Extraia de novo o Pascal.zip mais recente (ele já leva esses arquivos) ou peça a quem administra o computador para instalar o Microsoft Visual C++ Redistributable."),
+                           ("C++ files (Visual C++) are missing", "The advanced cutout needs them (msvcp140.dll).",
+                            "Extract the latest Pascal.zip again (it already carries these files) or ask whoever administers the computer to install the Microsoft Visual C++ Redistributable.")))
+    if any((base / "bin").rglob("realesrgan-ncnn-vulkan.exe")) and not (Path(sysroot) / "System32" / "vulkan-1.dll").is_file():
+        items.append(_item("warn", ("Este computador não tem o Vulkan (driver de vídeo)", "Falta o arquivo vulkan-1.dll.",
+                                    "Só a ampliação avançada fica indisponível; o modo Rápido e o recorte funcionam normalmente."),
+                           ("This computer has no Vulkan (video driver)", "vulkan-1.dll is missing.",
+                            "Only the advanced upscaling is unavailable; Fast mode and the cutout work normally.")))
 
     # pastas de trabalho
     bad = []

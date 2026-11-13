@@ -131,7 +131,11 @@ Um de cada vez. Escolha o vídeo, renderize, e depois escolha o próximo. Os aju
 4. Se aparecer **Desbloquear arquivos**, clique nele: o Windows marca como "baixado da internet" tudo que vem de um zip e às vezes bloqueia os programas. Você também pode, antes de extrair, clicar com o botão direito no `Pascal.zip`, escolher **Propriedades** e marcar **Desbloquear**.
 5. Baixe o **`Pascal.zip` da página Releases** do GitHub. O botão verde *Code → Download ZIP* só traz o código, sem o FFmpeg e o Python, e o Pascal não consegue ler o vídeo.
 6. Extraia o zip antes de abrir (botão direito → **Extrair tudo**) e use o Google Chrome ou o Microsoft Edge.
-7. Se o recorte avançado estiver indisponível (por exemplo, falta o *Microsoft Visual C++ Redistributable*, que a Verificação indica), o Pascal usa o recorte clássico sozinho e avisa no vídeo. Ele funciona, só com o cabelo menos natural.
+7. Se o recorte avançado estiver indisponível, o Pascal usa o recorte clássico sozinho e avisa no vídeo, com o motivo. Ele funciona, só com o cabelo menos natural.
+
+## Preciso instalar o C++ ou ser administrador?
+
+Não. A partir da versão 1.0.2 o Pascal já leva dentro da própria pasta os arquivos do Microsoft Visual C++ de que o recorte avançado precisa, e roda em um login comum, sem administrador. Se você usa uma versão mais antiga e o computador não tem o C++, baixe o `Pascal.zip` mais recente.
 
 ## Posso usar o Pascal em inglês?
 

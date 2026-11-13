@@ -40,22 +40,26 @@ def find_python(base: Path) -> str | None:
     """Primeiro Python que consegue importar numpy e onnxruntime (o portátil, o que roda o programa, o do sistema)."""
     if "py" in _PY_CACHE:
         return _PY_CACHE["py"]
-    cands = [str(base / "python" / "python.exe"), sys.executable, shutil.which("python") or "", shutil.which("py") or ""]
+    portable = str(base / "python" / "python.exe")
+    cands = [portable, sys.executable, shutil.which("python") or "", shutil.which("py") or ""]
     found = None
     timed_out = False
     first_err = ""
+    tried: set[str] = set()
     for c in cands:
-        if not c or not Path(c).exists():
-            continue
-        cmd = [c, "-3"] if Path(c).stem.lower() == "py" else [c]
         try:
-            # na primeira vez o antivírus pode examinar os pacotes por vários segundos: tempo folgado
-            r = subprocess.run(cmd + ["-c", "import numpy, onnxruntime"], capture_output=True, text=True, errors="replace", timeout=240,
-                               creationflags=P.CREATE_NO_WINDOW)
+            key = c.lower().replace("/", "\\")
+            if not c or key in tried or "\\windowsapps\\" in key or not Path(c).exists():      # atalho da Microsoft Store (só abre a loja) não serve
+                continue
+            tried.add(key)
+            cmd = [c, "-3"] if Path(c).stem.lower() == "py" else [c]
+            # o Python do Pascal: tempo folgado (na 1ª vez o antivírus pode examinar os pacotes por vários segundos); os de fora: pouco
+            r = subprocess.run(cmd + ["-c", "import numpy, onnxruntime"], capture_output=True, text=True, errors="replace",
+                               timeout=240 if c == portable else 30, creationflags=P.CREATE_NO_WINDOW)
         except subprocess.TimeoutExpired:
             timed_out = True
             continue
-        except OSError:
+        except (OSError, ValueError):
             continue
         if r.returncode == 0:
             found = " ".join(cmd)

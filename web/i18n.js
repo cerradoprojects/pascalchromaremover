@@ -268,6 +268,9 @@
     ["Não consegui ler o quadro do vídeo.", "Couldn't read the frame from the video."],
     ["A ampliação avançada não está instalada nesta cópia do Pascal. Enquanto isso o Pascal usa o modo Rápido, que já dá um bom resultado.", "Advanced upscaling isn't installed in this copy of Pascal. Meanwhile Pascal uses Fast mode, which already gives a good result."],
     ["O PowerShell não está disponível neste computador.", "PowerShell isn't available on this computer."],
+    ["O Windows não deixa este login abrir esse arquivo (sem permissão). Copie o vídeo para uma pasta sua, como Documentos ou a Área de Trabalho, e escolha de novo.", "Windows doesn't let this login open that file (no permission). Copy the video to a folder of yours, like Documents or the Desktop, and choose it again."],
+    ["Isso não é um arquivo de vídeo. Escolha o arquivo do vídeo.", "That isn't a video file. Pick the video file."],
+    ["Este computador não tem o driver de vídeo com Vulkan (o arquivo vulkan-1.dll); a ampliação avançada não funciona aqui. O modo Rápido funciona normalmente.", "This computer has no video driver with Vulkan (the vulkan-1.dll file); advanced upscaling doesn't work here. Fast mode works normally."],
     // ---- verificação da instalação e quadro de prévia
     ["Verificar instalação", "Check installation"],
     ["Ver detalhes", "See details"],
