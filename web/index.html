@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Pascal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" type="image/png" href="/pascal-icon.png">
+<link rel="stylesheet" href="/style.css">
+<script>window.TOKEN = "__TOKEN__";</script>
+</head>
+<body>
+<header>
+  <img class="logo" src="/pascal.png" alt="Pascal, o camaleão">
+  <div class="brand">
+    <h1>Pascal</h1>
+    <span class="sub">Seu vídeo gravado no escritório com cara de estúdio</span>
+  </div>
+  <div class="hdr-actions">
+    <button id="btnAside" class="ghost" title="Esconde ou mostra o painel da esquerda para dar mais espaço ao vídeo">◧ Painel</button>
+    <button id="btnHelp" class="ghost">Ajuda e perguntas</button>
+    <div class="seg langseg" id="langSeg" title="Idioma / Language"><button data-lang="pt" class="on">PT</button><button data-lang="en">EN</button></div>
+    <button id="btnQuit" class="ghost" title="Fecha o programa">Fechar programa</button>
+  </div>
+</header>
+
+<div id="alertFfmpeg" class="alert" hidden data-en="<b>FFmpeg not found.</b> Put <code>ffmpeg.exe</code> and <code>ffprobe.exe</code> inside Pascal's <code>bin</code> folder and open it again.">
+  <b>FFmpeg não encontrado.</b> Coloque <code>ffmpeg.exe</code> e <code>ffprobe.exe</code> dentro da pasta <code>bin</code> do Pascal e abra de novo.
+</div>
+
+<main>
+  <aside>
+    <section class="card step">
+      <h2><span class="num">1</span> Escolha o vídeo</h2>
+      <div class="row">
+        <input id="path" type="text" placeholder="Cole o caminho do vídeo ou clique em Escolher">
+        <button id="btnBrowse" class="soft">Escolher…</button>
+      </div>
+      <div class="row" id="inputListRow" hidden><select id="inputList"></select></div>
+      <div id="info" class="muted">Nenhum vídeo escolhido.</div>
+    </section>
+
+    <section class="card step">
+      <h2><span class="num">2</span> O que o Pascal faz</h2>
+      <label class="tog"><input type="checkbox" id="mod_chroma"><span class="sw"></span><span class="tx"><b>Recortar o fundo verde</b><i>tira o verde e deixa só a pessoa</i></span></label>
+      <label class="tog sub1"><input type="checkbox" id="transp"><span class="sw"></span><span class="tx"><b>Fundo transparente</b><i>arquivo .MOV para o Premiere (sem isto, o fundo é preto de estúdio)</i></span></label>
+      <label class="tog"><input type="checkbox" id="mod_grade"><span class="sw"></span><span class="tx"><b>Luz e cor de estúdio</b><i>tom quente, brilho do rosto e contraste</i></span></label>
+      <label class="tog"><input type="checkbox" id="mod_upscale"><span class="sw"></span><span class="tx"><b>Nitidez e tamanho Full HD</b><i>sempre 1080p, vídeo vertical ou horizontal</i></span></label>
+      <label class="tog"><input type="checkbox" id="mod_audio"><span class="sw"></span><span class="tx"><b>Áudio de estúdio</b><i>só ajusta o volume (mexer mais piora o som)</i></span></label>
+    </section>
+
+    <section class="card step">
+      <h2><span class="num">3</span> Onde salvar</h2>
+      <div class="folder"><span class="ico">📁</span><span id="outDir" class="dir">…</span></div>
+      <div class="row">
+        <button id="btnFolder" class="soft">Escolher pasta…</button>
+        <button id="btnOpenOut" class="ghost">Abrir pasta</button>
+      </div>
+      <div class="row"><button id="btnVideoFolder" class="ghost small">Usar a pasta do próprio vídeo</button></div>
+      <div class="muted small">Se você não escolher, o Pascal salva na mesma pasta do vídeo original.</div>
+      <details class="mini"><summary>Digitar o caminho da pasta</summary>
+        <div class="row"><input id="outDirText" type="text" placeholder="D:\Videos\Prontos"><button id="btnSetFolder" class="soft">Usar</button></div>
+      </details>
+    </section>
+
+    <section class="card step">
+      <h2><span class="num">4</span> Gerar</h2>
+      <button id="btnPreview" class="primary">Testar 5 segundos</button>
+      <div class="muted small" style="margin:-4px 0 8px" data-en="The test is also saved to the destination folder as <b>name_sample.mp4</b>, so you can open it in another player. With a transparent background the test only shows here in Pascal (an ordinary player can't display transparency).">O teste também é salvo na pasta de destino como <b>nome_sample.mp4</b>, para você abrir em outro player. Com fundo transparente, o teste aparece só aqui no Pascal (um player comum não mostra a transparência).</div>
+      <button id="btnRender" class="accent">Renderizar o vídeo completo</button>
+      <div id="progressBox" hidden>
+        <div class="bar"><div id="bar"></div></div>
+        <div class="row between"><span id="progressText">—</span><button id="btnCancel" class="ghost small">Cancelar</button></div>
+        <div id="awakeNote" class="muted small" hidden>🔒 Enquanto o vídeo é gerado, o Pascal pede ao Windows para não dormir nem desligar. Se você mandar desligar, o Windows avisa que o Pascal está trabalhando.</div>
+      </div>
+      <div id="result" class="result" hidden></div>
+    </section>
+
+    <details class="card step compact presets" id="presetsBox">
+      <summary>Meus ajustes salvos</summary>
+      <div class="row"><button id="btnReset" class="soft">Voltar ao padrão Pascal</button></div>
+      <div class="row"><input id="presetName" type="text" placeholder="nome do meu ajuste"><button id="btnSavePreset" class="soft">Salvar</button></div>
+      <div class="row"><select id="presetList"></select><button id="btnLoadPreset" class="soft">Abrir</button></div>
+      <div class="row"><button id="btnExport" class="ghost">Baixar .json</button><label class="filebtn ghost">Abrir .json<input id="fileImport" type="file" accept=".json" hidden></label></div>
+    </details>
+
+    <footer class="about">
+      <p>Aplicativos gratuitos criados por um egresso de universidade pública e gratuita de Brasília. Livres para usar, livres para melhorar. Para sempre.</p>
+      <p><a href="https://github.com/cerradoprojects/pascalchromaremover" target="_blank" rel="noopener noreferrer" title="https://github.com/cerradoprojects/pascalchromaremover">Pascal no GitHub</a> · <a href="https://github.com/cerradoprojects" target="_blank" rel="noopener noreferrer" title="https://github.com/cerradoprojects">Cerrado Projects</a></p>
+    </footer>
+  </aside>
+
+  <section id="stage">
+    <div class="card viewer" id="viewerCard">
+      <div class="vbar">
+        <div class="seg" id="modeSeg">
+          <button id="modeLive" class="on">Quadro ao vivo</button>
+          <button id="modeVideo">Vídeo de teste</button>
+        </div>
+        <div class="seg" id="cmpSeg">
+          <button id="cmpProc" class="on">Pascal</button>
+          <button id="cmpSplit">Dividido</button>
+          <button id="cmpOrig">Original</button>
+        </div>
+        <div class="seg" id="zoomSeg">
+          <button data-z="fit" class="on">Tela</button>
+          <button data-z="1">100%</button>
+          <button data-z="2">200%</button>
+          <button data-z="4">400%</button>
+          <button data-z="8">800%</button>
+        </div>
+        <div class="bgbox" id="bgBox" title="Cor de fundo por trás da pessoa (só aparece quando a saída é transparente)">
+          <span class="muted">Fundo</span>
+          <div class="seg" id="bgSeg">
+            <button data-bg="#000" class="on" style="--c:#000" title="Preto"></button>
+            <button data-bg="#1c1c1c" style="--c:#1c1c1c" title="Grafite"></button>
+            <button data-bg="#808080" style="--c:#808080" title="Cinza"></button>
+            <button data-bg="#ffffff" style="--c:#fff" title="Branco"></button>
+            <button data-bg="#2e7bff" style="--c:#2e7bff" title="Azul"></button>
+            <button data-bg="#1fa35c" style="--c:#1fa35c" title="Verde"></button>
+            <button data-bg="#d64545" style="--c:#d64545" title="Vermelho"></button>
+            <button data-bg="#f2b84b" style="--c:#f2b84b" title="Âmbar"></button>
+            <button data-bg="check" class="chk" title="Xadrez"></button>
+          </div>
+          <label class="bgpick" id="bgPickBox" title="Escolher qualquer outra cor"><input type="color" id="bgPick" value="#7a3fb8"></label>
+        </div>
+        <button id="btnFull" class="soft small fullbtn" title="Tela cheia (tecla F)">⛶ Tela cheia</button>
+      </div>
+
+      <div id="liveWrap">
+        <div id="viewport">
+          <div id="layer">
+            <img id="imgOrig" alt="">
+            <img id="imgProc" alt="">
+          </div>
+          <div id="splitLine" hidden><span></span></div>
+          <div id="splitTagL" class="splittag" hidden>Original</div><div id="splitTagR" class="splittag" hidden>Pascal</div>
+          <div id="liveMsg" class="livemsg">Escolha um vídeo para ver o quadro aqui.</div>
+          <div id="liveBusy" class="livebusy" hidden><i></i><span id="liveBusyText">Atualizando…</span></div>
+          <div id="zoomHint" class="zoomhint">Role o mouse para dar zoom · arraste para mover</div>
+        </div>
+        <div class="tl">
+          <span class="muted">Quadro:</span>
+          <input id="atSlider" type="range" min="0" max="60" step="0.5" value="10">
+          <span id="atLabel" class="muted">0:10</span>
+          <span id="pxInfo" class="muted"></span>
+        </div>
+      </div>
+
+      <div id="videoWrap" hidden>
+        <video id="video" controls playsinline></video>
+        <div id="videoEmpty" data-en="The test video appears here.<br>Click <b>Test 5 seconds</b>.">O vídeo de teste aparece aqui.<br>Clique em <b>Testar 5 segundos</b>.</div>
+      </div>
+      <div id="abBar" class="row" hidden>
+        <button id="btnProc" class="small on">Pascal</button>
+        <button id="btnOrig" class="small">Original (para comparar)</button>
+        <span class="muted">troca imagem e som, no mesmo ponto</span>
+        <button id="btnLogs" class="ghost small" style="margin-left:auto">Abrir pasta de relatórios</button>
+      </div>
+      <div id="previewNote" class="muted"></div>
+      <details id="reportBox" class="reportbox" hidden><summary id="reportSum">Relatório do teste</summary><div id="report"></div></details>
+    </div>
+
+    <div id="splitter" role="separator" aria-orientation="horizontal" title="Arraste para aumentar ou diminuir o vídeo. Dois cliques escondem ou mostram os ajustes."><span></span></div>
+
+    <div class="card settings">
+      <div class="sethead"><span>Ajustes</span><span class="muted">tudo muda no quadro ao vivo, na hora</span><button id="btnSetHide" class="ghost small" style="margin-left:auto" title="Esconde os ajustes para o vídeo ocupar tudo">▾ Esconder ajustes</button></div>
+      <nav id="tabs"></nav>
+      <div id="panels"></div>
+    </div>
+  </section>
+</main>
+
+<div id="helpModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-top">
+      <div class="seg"><button id="docFaq" class="on">Perguntas frequentes</button><button id="docSteps">Passo a passo</button></div>
+      <button id="helpClose" class="ghost">Fechar ✕</button>
+    </div>
+    <div id="docBody" class="doc">Carregando…</div>
+  </div>
+</div>
+
+<script src="/i18n.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
