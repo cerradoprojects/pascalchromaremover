@@ -8,7 +8,7 @@ Where a license requires it, the place to get the corresponding source code is g
 |---|---|---|---|
 | **FFmpeg** (build "essentials" from gyan.dev: `ffmpeg.exe`, `ffprobe.exe`) | `bin\` | GNU GPL v3 (the build is configured with `--enable-gpl --enable-version3`) | FFmpeg source: https://ffmpeg.org/download.html — build and source information: https://www.gyan.dev/ffmpeg/builds/ |
 | **Robust Video Matting** — model file `rvm_resnet50_fp32.onnx` | `bin\rvm\` | GNU GPL v3 | https://github.com/PeterL1n/RobustVideoMatting — Shanchuan Lin et al., *Robust High-Resolution Video Matting with Temporal Guidance* (WACV 2022) |
-| **Real-ESRGAN ncnn Vulkan** (`realesrgan-ncnn-vulkan.exe` and its models; optional "advanced upscaling") | `bin\realesrgan\` | MIT (program) / BSD-3-Clause (models); see `bin\realesrgan\README_windows.md` | https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan — https://github.com/xinntao/Real-ESRGAN |
+| **Real-ESRGAN ncnn Vulkan** (`realesrgan-ncnn-vulkan.exe` and its models; optional "advanced upscaling") | `bin\realesrgan\` | MIT (program, © 2021 Xintao Wang) / BSD-3-Clause (models, © 2021 Xintao Wang); full texts in the `licenses\` folder | https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan — https://github.com/xinntao/Real-ESRGAN |
 | **Python** (Windows embeddable package 3.12) | `python\` | Python Software Foundation License (`python\LICENSE.txt`) | https://www.python.org |
 | **NumPy** | `python\Lib\site-packages\numpy` | BSD-3-Clause (license file in the package's `*.dist-info`) | https://numpy.org |
 | **ONNX Runtime** | `python\Lib\site-packages\onnxruntime` | MIT (license and third-party notices in the package's `*.dist-info`) | https://github.com/microsoft/onnxruntime |
