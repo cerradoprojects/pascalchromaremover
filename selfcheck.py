@@ -45,6 +45,113 @@ def ps_exe() -> str:
     return str(p) if p.is_file() else "powershell"
 
 
+def cpu_flags() -> str:
+    """Instruções do processador que importam para numpy/onnxruntime, ex.: 'SSE4.2 sim · AVX sim · AVX2 sim'."""
+    try:
+        f = ctypes.windll.kernel32.IsProcessorFeaturePresent
+        return " · ".join(f"{n} {'sim' if f(c) else 'NÃO'}" for n, c in (("SSE4.2", 38), ("AVX", 39), ("AVX2", 40)))
+    except (AttributeError, OSError):
+        return ""
+
+
+def matte_steps(kind: str, lang: str, base: Path) -> list:
+    """Passo a passo para quem precisa agir quando o recorte avançado não funciona. kind: model | dll | crash | python | timeout | other."""
+    en = lang == "en"
+    again = ("Click Try again below: Pascal tries to fix it by itself." if en else "Clique em Tentar de novo (abaixo): o Pascal tenta consertar sozinho.")
+    unblock = ("Click Unblock files (below), then Try again." if en else "Clique em Desbloquear arquivos (abaixo) e depois em Tentar de novo.")
+    pyinst = (["Install Python 3.13 or 3.14, 64-bit: at python.org/downloads (choose \"Install for me only\": no administrator needed), or from the programs folder your company provides (for example X:\\Python).",
+               "Close Pascal and open it again with Iniciar_Pascal.bat. It finds that Python by itself and already carries the libraries: nothing else to install."]
+              if en else
+              ["Instale o Python 3.13 ou 3.14 de 64 bits: em python.org/downloads (escolha \"Instalar só para mim\": não precisa de administrador) ou na pasta de programas que a sua empresa oferece (por exemplo X:\\Python).",
+               "Feche o Pascal e abra de novo pelo Iniciar_Pascal.bat. Ele acha esse Python sozinho e já leva as bibliotecas: não precisa instalar mais nada."])
+    av = ("If an antivirus or security program is blocking Pascal's folder, ask whoever administers the computer to allow it." if en
+          else "Se um antivírus ou programa de segurança estiver bloqueando a pasta do Pascal, peça a quem cuida do computador para liberá-la.")
+    rep = ("Click Copy report (below) and send it to whoever made Pascal." if en else "Clique em Copiar relatório (abaixo) e envie para quem fez o Pascal.")
+    if kind == "model":
+        return (["Download the full Pascal.zip from the GitHub Releases page (not Code > Download ZIP).", "Extract everything and open Iniciar_Pascal.bat again."] if en
+                else ["Baixe o Pascal.zip completo na página Releases do GitHub (não o botão Code > Download ZIP).", "Extraia tudo e abra o Iniciar_Pascal.bat de novo."])
+    if kind == "dll":
+        return [unblock, av] + pyinst + [rep]
+    if kind == "timeout":
+        return (["Wait two minutes (the antivirus is probably scanning the files for the first time).", again])
+    if kind == "crash":
+        return pyinst + [unblock, av, rep]          # o Pascal já tentou consertar sozinho: o que resta é um Python instalado ou liberar a pasta
+    return [again] + pyinst + [av, rep]
+
+
+def auto_reparo(base: Path, notify=lambda m: None) -> list:
+    """Tenta consertar o recorte avançado sozinho, sem administrador. Devolve o que tentou: lista de {"pt","en","ok"}.
+    1) tira a marca de "baixado da internet"; 2) se o Python abre mas cai ao carregar os pacotes, deixa de usar as cópias do C++ da pasta python
+    (o Windows já tem as dele) e testa de novo — desfaz se não ajudar."""
+    import matte_ai as MA
+    import pacotes as PK
+    feitos: list = []
+    portable = base / "python" / "python.exe"
+
+    def refaz() -> bool:
+        MA._PY_CACHE.clear()
+        return MA.find_python(base) is not None
+
+    def anota(pt: str, en: str, ok: bool) -> None:
+        feitos.append({"pt": pt, "en": en, "ok": ok})
+        notify(pt)
+
+    # 1) marca de "baixado da internet"
+    marked = False
+    for f in (str(portable), str(base / "bin" / "ffmpeg.exe")):
+        try:
+            with open(f + ":Zone.Identifier", "rb"):
+                marked = True
+                break
+        except OSError:
+            pass
+    if marked:
+        notify("Desbloqueando os arquivos do Pascal…")
+        unblock(base)
+        ok = refaz()
+        anota("Tirei a marca de \"baixado da internet\" dos arquivos e testei de novo.", "Removed the \"downloaded from the internet\" mark from the files and tested again.", ok)
+        if ok:
+            return feitos
+    # 2) cópias locais do C++ atrapalhando
+    sysdir = Path(os.environ.get("SystemRoot") or r"C:\Windows") / "System32"
+    local = base / "python"
+    off = local / "_cpp_off"
+    movidos = []
+    if portable.is_file():
+        for nome in ("msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "msvcp140_atomic_wait.dll", "msvcp140_codecvt_ids.dll", "concrt140.dll"):
+            if (local / nome).is_file() and (sysdir / nome).is_file():
+                movidos.append(nome)
+    if movidos:
+        notify("Testando sem as cópias do C++ da pasta do Pascal…")
+        try:
+            off.mkdir(exist_ok=True)
+            for nome in movidos:
+                shutil.move(str(local / nome), str(off / nome))
+            ok = refaz()
+            if ok:
+                anota("O Python do Pascal travava com as cópias do C++ que vão na pasta; passei a usar as do Windows e funcionou.",
+                      "Pascal's Python crashed with the C++ copies in its folder; switched to Windows' own and it worked.", True)
+                return feitos
+            for nome in movidos:                       # não ajudou: devolve como estava
+                shutil.move(str(off / nome), str(local / nome))
+            refaz()
+            anota("Tentei usar o C++ do Windows em vez das cópias do Pascal: não resolveu (voltei ao original).",
+                  "Tried Windows' C++ instead of Pascal's copies: it didn't help (restored the original).", False)
+        except OSError as e:
+            for nome in movidos:
+                try:
+                    if (off / nome).is_file():
+                        shutil.move(str(off / nome), str(local / nome))
+                except OSError:
+                    pass
+            anota(f"Não consegui testar o C++ do Windows ({str(e)[:80]}).", f"Couldn't test Windows' C++ ({str(e)[:80]}).", False)
+    # 3) procurou outros Pythons no computador (feito dentro de find_python)
+    outros = [c for c in PK.candidatos(base) if Path(c[0]) != portable]
+    anota(f"Procurei outros Pythons neste computador ({len(outros)} lugar(es) testado(s)): nenhum serviu.",
+          f"Looked for other Pythons on this computer ({len(outros)} place(s) tested): none worked.", False)
+    return feitos
+
+
 def _is_blocked(err: Exception) -> bool:
     """O Windows (antivírus, SmartScreen, Controle de Aplicativo) recusou rodar o arquivo?"""
     code = getattr(err, "winerror", None)
@@ -94,7 +201,10 @@ def run(base: Path, ffmpeg: str | None, ffprobe: str | None, out_dir: Path, brow
     cpus = os.cpu_count() or 0
     sysline = f"{platform.platform()} · {cpus} núcleos" + (f" · {ram[0]:.1f} GB de memória" if ram else "")
     sysline_en = f"{platform.platform()} · {cpus} cores" + (f" · {ram[0]:.1f} GB of memory" if ram else "")
-    items.append(_item("ok", ("Computador", sysline + f" · Python {platform.python_version()}"), ("Computer", sysline_en + f" · Python {platform.python_version()}")))
+    cf = cpu_flags()
+    items.append(_item("ok", ("Computador", sysline + f" · Python {platform.python_version()}" + (f" · {cf}" if cf else "")),
+                       ("Computer", sysline_en + f" · Python {platform.python_version()}" + (f" · {cf.replace('sim', 'yes').replace('NÃO', 'NO')}" if cf else ""))))
+    matte = {"ok": False, "kind": "other", "why": ""}
 
     # onde o Pascal está
     p = str(base)
@@ -119,9 +229,11 @@ def run(base: Path, ffmpeg: str | None, ffprobe: str | None, out_dir: Path, brow
             model = cand
             break
     if model is None:
+        matte.update(kind="model", why="Falta o arquivo do modelo (bin\\rvm\\rvm_resnet50_fp32.onnx).")
         items.append(_item("warn", ("Modelo do recorte avançado ausente", "Falta bin\\rvm\\rvm_resnet50_fp32.onnx.", "Sem ele o Pascal usa o recorte clássico. Baixe o Pascal.zip completo para ter o recorte avançado."),
                            ("Advanced cutout model missing", "bin\\rvm\\rvm_resnet50_fp32.onnx is missing.", "Without it Pascal uses the classic cutout. Download the full Pascal.zip to get the advanced cutout.")))
     elif model.stat().st_size < 50 * 2**20:
+        matte.update(kind="model", why=f"O arquivo do modelo está incompleto ({model.stat().st_size / 2**20:.0f} MB).")
         items.append(_item("warn", ("Modelo do recorte avançado incompleto", f"{model.stat().st_size / 2**20:.0f} MB (o esperado é cerca de 100 MB).", "Baixe o Pascal.zip de novo."),
                            ("Advanced cutout model is incomplete", f"{model.stat().st_size / 2**20:.0f} MB (about 100 MB expected).", "Download Pascal.zip again.")))
     else:
@@ -137,6 +249,7 @@ def run(base: Path, ffmpeg: str | None, ffprobe: str | None, out_dir: Path, brow
                 if txt:
                     errs.append((cmd[0], txt, ver))
             if found:
+                matte.update(ok=True, kind="", why="")
                 where = f"Python {found[2]} · {found[0]}"
                 items.append(_item("ok", ("Recorte avançado disponível", f"{found[1]} ({where})"), ("Advanced cutout available", f"{found[1]} ({where})")))
             else:
@@ -146,6 +259,7 @@ def run(base: Path, ffmpeg: str | None, ffprobe: str | None, out_dir: Path, brow
                 need_vc = any(k in err.upper() for k in ("DLL", "MSVCP", "VCRUNTIME", "ONNXRUNTIME_PYBIND"))
                 local_vc = (base / "python" / "msvcp140.dll").is_file()
                 act = ""
+                matte.update(kind="crash" if "travou" in err else "dll" if need_vc else "python", why=err)
                 if need_vc and local_vc:      # os arquivos do C++ já estão na pasta: então é o Windows/antivírus que impede o carregamento
                     pre_pt = "Os arquivos do C++ já vão dentro do Pascal, então algo no Windows (antivírus ou bloqueio de segurança) está impedindo o carregamento. Clique em Desbloquear arquivos ou libere a pasta do Pascal no antivírus. "
                     pre_en = "The C++ files already ship inside Pascal, so something in Windows (antivirus or a security block) is preventing them from loading. Click Unblock files or allow Pascal's folder in your antivirus. "
@@ -163,9 +277,11 @@ def run(base: Path, ffmpeg: str | None, ffprobe: str | None, out_dir: Path, brow
                 items.append(_item("warn", ("Recorte avançado indisponível neste computador", err, pre_pt + "Enquanto isso o Pascal usa o recorte clássico (mais rápido, menos natural no cabelo)."),
                                    ("Advanced cutout unavailable on this computer", err, pre_en + "Meanwhile Pascal uses the classic cutout (faster, less natural on hair)."), act))
         except subprocess.TimeoutExpired:
+            matte.update(kind="timeout", why="Mais de 2 minutos para carregar os pacotes.")
             items.append(_item("warn", ("O recorte avançado demorou demais para iniciar", "Mais de 2 minutos para carregar os pacotes (antivírus examinando?).", "Tente de novo em alguns minutos."),
                                ("The advanced cutout took too long to start", "More than 2 minutes to load the packages (antivirus scanning?).", "Try again in a few minutes.")))
         except OSError as e:
+            matte.update(kind="other", why=str(e)[:160])
             items.append(_item("warn", ("Não consegui testar o recorte avançado", str(e)[:160], "O Pascal usa o recorte clássico."),
                                ("Couldn't test the advanced cutout", str(e)[:160], "Pascal uses the classic cutout.")))
 
@@ -254,7 +370,8 @@ def run(base: Path, ffmpeg: str | None, ffprobe: str | None, out_dir: Path, brow
                             "If something doesn't work, click Unblock files (below)."), "unblock"))
 
     counts = {k: sum(1 for i in items if i["level"] == k) for k in ("ok", "warn", "fail")}
-    return {"items": items, "counts": counts, "when": time.strftime("%Y-%m-%d %H:%M:%S")}
+    matte["steps"] = {l: matte_steps(matte["kind"], l, base) for l in ("pt", "en")}
+    return {"items": items, "counts": counts, "when": time.strftime("%Y-%m-%d %H:%M:%S"), "matte": matte}
 
 
 def report_text(result: dict, lang: str) -> str:
@@ -266,6 +383,13 @@ def report_text(result: dict, lang: str) -> str:
         lines.append(sign[i["level"]] + t["title"] + (" — " + t["detail"] if t["detail"] else ""))
         if t["fix"] and i["level"] != "ok":
             lines.append("      → " + t["fix"])
+    m = result.get("matte") or {}
+    if m and not m.get("ok"):
+        lines += ["", "RECORTE AVANÇADO INDISPONÍVEL" if lang != "en" else "ADVANCED CUTOUT UNAVAILABLE", "  " + m.get("why", "")]
+        for r in m.get("repair", []):
+            lines.append(("  [tentei] " if lang != "en" else "  [tried] ") + r[lang] + ("  ✔" if r["ok"] else ""))
+        for n, s in enumerate(m["steps"][lang], 1):
+            lines.append(f"  {n}. {s}")
     return "\n".join(lines)
 
 

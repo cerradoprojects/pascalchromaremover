@@ -133,6 +133,15 @@ Um de cada vez. Escolha o vídeo, renderize, e depois escolha o próximo. Os aju
 6. Extraia o zip antes de abrir (botão direito → **Extrair tudo**) e use o Google Chrome ou o Microsoft Edge.
 7. Se o recorte avançado estiver indisponível, o Pascal usa o recorte clássico sozinho e avisa no vídeo, com o motivo. Ele funciona, só com o cabelo menos natural.
 
+## Apareceu um aviso grande: "O recorte avançado não está funcionando neste computador". E agora?
+
+Ao abrir, o Pascal testa sozinho se tudo que precisa está disponível. Se o recorte avançado não abrir, ele primeiro **tenta consertar sozinho** (tira o bloqueio de "baixado da internet", testa sem as cópias do C++ da pasta, procura outros Pythons no computador) e só então mostra o aviso, com **o motivo exato** e o **passo a passo**. Enquanto isso fica uma faixa vermelha no alto e o Pascal usa o recorte clássico (funciona, mas o cabelo fica menos natural).
+
+1. Clique em **Tentar de novo**. O Pascal repete o teste e o conserto.
+2. Se continuar, instale o **Python 3.13 ou 3.14 de 64 bits** (python.org/downloads, opção "Instalar só para mim", sem administrador; no computador corporativo, a pasta `X:\Python`). Feche o Pascal e abra de novo: ele acha o Python sozinho e já leva as bibliotecas.
+3. Clique em **Desbloquear arquivos** e depois em **Tentar de novo**. Se um antivírus estiver bloqueando a pasta do Pascal, peça a quem cuida do computador para liberá-la.
+4. Clique em **Copiar relatório** e envie para quem fez o Pascal. Para continuar trabalhando agora, clique em **Continuar com o recorte clássico**.
+
 ## Preciso instalar o C++ ou ser administrador?
 
 Não. A partir da versão 1.0.2 o Pascal já leva dentro da própria pasta os arquivos do Microsoft Visual C++ de que o recorte avançado precisa, e roda em um login comum, sem administrador. Se você usa uma versão mais antiga e o computador não tem o C++, baixe o `Pascal.zip` mais recente.

@@ -133,6 +133,15 @@ One at a time. Choose the video, render, and then choose the next. The settings 
 6. Extract the zip before opening it (right-click → **Extract all**) and use Google Chrome or Microsoft Edge.
 7. If the advanced cutout is unavailable, Pascal uses the classic cutout by itself and warns you on the video, with the reason. It works, just with less natural hair.
 
+## A big warning appeared: "The advanced cutout is not working on this computer". Now what?
+
+When it opens, Pascal tests by itself whether everything it needs is available. If the advanced cutout doesn't start, it first **tries to fix it on its own** (removes the "downloaded from the internet" block, tests without the C++ copies in its folder, looks for other Pythons on the computer) and only then shows the warning, with **the exact reason** and **step-by-step instructions**. Meanwhile a red strip stays at the top and Pascal uses the classic cutout (it works, but hair looks less natural).
+
+1. Click **Try again**. Pascal repeats the test and the repair.
+2. If it persists, install **Python 3.13 or 3.14, 64-bit** (python.org/downloads, "Install for me only" option, no administrator; on a corporate computer, the `X:\Python` folder). Close Pascal and open it again: it finds Python by itself and already carries the libraries.
+3. Click **Unblock files**, then **Try again**. If an antivirus is blocking Pascal's folder, ask whoever administers the computer to allow it.
+4. Click **Copy report** and send it to whoever made Pascal. To keep working right now, click **Continue with the classic cutout**.
+
 ## Do I need to install C++ or be an administrator?
 
 No. From version 1.0.2 on, Pascal carries the Microsoft Visual C++ files that the advanced cutout needs inside its own folder, and it runs on a regular login, without administrator rights. If you use an older version and the computer doesn't have C++, download the latest `Pascal.zip`.

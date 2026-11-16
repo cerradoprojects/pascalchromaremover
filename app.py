@@ -83,7 +83,7 @@ def console(msg: str) -> None:
 
 
 # verificação da instalação (Ajuda > Verificar instalação): roda uma vez ao abrir, em segundo plano
-SELF: dict = {"result": None, "running": False}
+SELF: dict = {"result": None, "running": False, "stage": ""}
 SELF_LOCK = threading.Lock()
 
 
@@ -97,7 +97,19 @@ def start_selfcheck(fresh: bool = False) -> None:
 
     def work() -> None:
         try:
+            MA._PY_CACHE.clear()                  # refaz também a busca do Python usada pelo quadro e pelo render
+            SELF["stage"] = "Testando se tudo que o Pascal precisa está disponível neste computador…"
             res = SC.run(BASE, FFMPEG, FFPROBE, current_out_dir(), find_browser())
+            if not res["matte"]["ok"] and res["matte"]["kind"] not in ("model", "timeout"):
+                # o recorte avançado não abriu: o Pascal tenta consertar sozinho antes de pedir qualquer coisa à pessoa
+                try:
+                    feitos = SC.auto_reparo(BASE, lambda m: SELF.update(stage=m))
+                except Exception:  # noqa: BLE001
+                    log(traceback.format_exc())
+                    feitos = []
+                SELF["stage"] = "Conferindo de novo…"
+                res = SC.run(BASE, FFMPEG, FFPROBE, current_out_dir(), find_browser())
+                res["matte"]["repair"] = feitos
             SELF["result"] = res
             try:
                 (CACHE / "diagnostico.txt").write_text(SC.report_text(res, "pt") + "\n\n" + SC.report_text(res, "en") + "\n", encoding="utf-8")
@@ -883,9 +895,12 @@ class Handler(BaseHTTPRequestHandler):
             start_selfcheck(q.get("fresh", ["0"])[0] == "1")
             res = SELF["result"]
             if res is None:
-                self._json({"pending": True})
+                self._json({"pending": True, "stage": SELF["stage"]})
             else:
+                m = res["matte"]
                 self._json({"counts": res["counts"], "when": res["when"], "text": SC.report_text(res, lang),
+                            "matte": {"ok": m["ok"], "kind": m["kind"], "why": m["why"], "steps": m["steps"][lang],
+                                      "repair": [{"text": r[lang], "ok": r["ok"]} for r in m.get("repair", [])]},
                             "items": [{"level": i["level"], "action": i["action"], **i[lang]} for i in res["items"]]})
         elif route == "/api/ping":
             LAST_PING.update(t=time.time(), seen=True)

@@ -786,11 +786,12 @@ async function showDoc(name) {
 
 // ------------------------------------------------------------------ verificar instalação (o que falta neste computador)
 const curLang = () => (window.I18N ? window.I18N.lang : "pt");
-async function fetchSelfcheck(fresh) {
-  for (let i = 0; i < 100; i++) {
+async function fetchSelfcheck(fresh, onPending) {
+  for (let i = 0; i < 200; i++) {
     const r = await api("/api/selfcheck?lang=" + curLang() + (fresh && i === 0 ? "&fresh=1" : ""));
     if (!r.pending) return r;
-    await new Promise((res) => setTimeout(res, 1500));
+    if (onPending) onPending(r.stage);
+    await new Promise((res) => setTimeout(res, 1200));
   }
   return null;
 }
@@ -852,14 +853,47 @@ async function showCheck(fresh) {
   box.append(bar, det);
 }
 // aviso vermelho no alto se a verificação achou um problema que impede o Pascal de trabalhar (ex.: FFmpeg bloqueado ou ausente)
-async function checkInstallBanner() {
+let matteShown = false, lastCheck = null;
+function renderMatteModal(r) {
+  const m = r.matte;
+  $("matteWhy").textContent = m.why || "";
+  $("matteWhy").hidden = !m.why;
+  $("matteTried").hidden = !(m.repair && m.repair.length);
+  $("matteTriedList").innerHTML = "";
+  (m.repair || []).forEach((x) => { const li = document.createElement("li"); li.textContent = (x.ok ? "✔ " : "✖ ") + x.text; $("matteTriedList").appendChild(li); });
+  $("matteSteps").innerHTML = "";
+  m.steps.forEach((s) => { const li = document.createElement("li"); li.textContent = s; $("matteSteps").appendChild(li); });
+}
+async function checkInstallBanner(fresh) {
+  $("alertTesting").hidden = false;
   try {
-    const r = await fetchSelfcheck(false);
-    const bad = r && r.items.find((i) => i.level === "fail");
+    const r = await fetchSelfcheck(!!fresh, (stage) => { if (stage) $("alertTestingText").textContent = T(stage); });
+    $("alertTesting").hidden = true;
+    if (!r) return;
+    lastCheck = r;
+    const bad = r.items.find((i) => i.level === "fail");
     $("alertInstall").hidden = !bad;
     if (bad) $("alertInstallText").textContent = bad.title + (bad.detail ? " — " + bad.detail : "");
-  } catch (e) { /* sem verificação: a tela segue normal */ }
+    const off = !!(r.matte && !r.matte.ok);
+    $("alertMatte").hidden = !off;
+    if (off) {
+      renderMatteModal(r);
+      if (!matteShown || fresh) { matteShown = true; $("matteModal").hidden = false; }      // aviso grande ao abrir (e de novo se a tentativa falhar)
+    } else $("matteModal").hidden = true;
+  } catch (e) { $("alertTesting").hidden = true; /* sem verificação: a tela segue normal */ }
 }
+$("btnMatteHow").onclick = () => { if (lastCheck) renderMatteModal(lastCheck); $("matteModal").hidden = false; };
+$("matteClose").onclick = () => { $("matteModal").hidden = true; };
+$("matteRetry").onclick = () => { $("matteModal").hidden = true; checkInstallBanner(true); };
+$("matteUnblock").onclick = async () => {
+  $("matteModal").hidden = true; $("alertTesting").hidden = false; $("alertTestingText").textContent = T("Desbloqueando…");
+  try { await api("/api/unblock", {}); } catch (e) { /* a verificação abaixo mostra o resultado */ }
+  checkInstallBanner(false);
+};
+$("matteCopy").onclick = async () => {
+  const ok = lastCheck && await copyText(lastCheck.text);
+  $("matteCopy").textContent = ok ? T("Relatório copiado.") : T("Copiar relatório");
+};
 $("btnInstallDetails").onclick = () => { $("helpModal").hidden = false; showDoc("check"); };
 window.addEventListener("pascal-lang", () => { if (!$("helpModal").hidden) showDoc(currentDoc); checkInstallBanner(); });   // botão PT/EN: troca o texto da ajuda e do aviso
 $("btnHelp").onclick = () => { $("helpModal").hidden = false; showDoc("faq"); };

@@ -19,8 +19,20 @@ VERSOES = ((3, 12), (3, 13), (3, 14))      # versões para as quais o Pascal lev
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 # imprime a versão ANTES de importar: se o import falhar, ainda dá para dizer qual Python era
 _TESTE = ("import sys, struct; print('VER', '%d.%d.%d' % sys.version_info[:3], struct.calcsize('P') * 8, flush=True); "
-          "sys.path.insert(0, {base!r}); import pacotes; pacotes.ativar(); import numpy, onnxruntime; "
+          "sys.path.insert(0, {base!r}); import pacotes; pacotes.ativar(); "
+          "print('STEP numpy', flush=True); import numpy; print('STEP onnxruntime', flush=True); import onnxruntime; "
           "print('OK numpy', numpy.__version__, '| onnxruntime', onnxruntime.__version__)")
+
+# códigos de saída do Windows quando o programa "cai" sem dizer nada (NTSTATUS)
+CRASH = {0xC0000005: "acesso inválido à memória", 0xC000001D: "instrução que o processador não tem", 0xC0000135: "falta uma DLL",
+         0xC000007B: "DLL de outro tipo (32/64 bits)", 0xC0000142: "uma DLL não conseguiu iniciar", 0xC0000409: "falha interna de segurança",
+         0xC0000374: "memória corrompida", 0xC0000022: "acesso negado pelo Windows"}
+
+
+def explica_codigo(code: int) -> str:
+    """'0xC0000005 (acesso inválido à memória)' ou só o número, para um código de saída do Windows."""
+    c = code & 0xFFFFFFFF
+    return f"0x{c:08X}" + (f" ({CRASH[c]})" if c in CRASH else "")
 
 
 def pasta(base: Path = BASE, ver: tuple = None) -> Path | None:
@@ -103,14 +115,23 @@ def testar(cmd: list, base: Path = BASE, timeout: float = 30) -> tuple:
         raise
     except (OSError, ValueError) as e:            # bloqueado pelo Windows, sem permissão etc.
         return False, f"não abriu ({e.__class__.__name__}: {str(e)[:120]})", "", 0
-    ver, bits = "", 0
+    ver, bits, etapa = "", 0, ""
     for ln in r.stdout.splitlines():
         if ln.startswith("VER "):
             partes = ln.split()
             ver, bits = partes[1], int(partes[2]) if len(partes) > 2 and partes[2].isdigit() else 0
+        elif ln.startswith("STEP "):
+            etapa = ln[5:].strip()
         elif ln.startswith("OK ") and r.returncode == 0:
             return True, ln[3:].strip(), ver, bits
-    err = (r.stderr.strip().splitlines() or [f"saiu com código {r.returncode}"])[-1][:200]
+    linhas = r.stderr.strip().splitlines()
+    caiu = bool(r.returncode & 0x80000000)            # código 0xC0000xxx: o programa foi derrubado pelo Windows
+    if linhas and any(k in linhas[-1] for k in ("Error", "Exception")):
+        err = linhas[-1][:200]                        # o Python explicou o erro
+    elif caiu and etapa:                              # abriu e caiu no meio de um import: diz qual
+        err = f"travou ao carregar o {etapa} — o programa fechou sozinho, código {explica_codigo(r.returncode)}"
+    else:
+        err = (linhas[-1][:200] if linhas else f"saiu com código {explica_codigo(r.returncode)}")
     if ver:
         mm = tuple(int(x) for x in ver.split(".")[:2])
         if bits and bits != 64:

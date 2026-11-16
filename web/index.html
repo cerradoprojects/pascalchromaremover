@@ -31,6 +31,29 @@
   <b>O Pascal encontrou um problema nesta cópia:</b> <span id="alertInstallText"></span> <button id="btnInstallDetails" class="small">Ver detalhes</button>
 </div>
 
+<div id="alertTesting" class="alert info" hidden><span id="alertTestingText">Testando se tudo que o Pascal precisa está disponível neste computador…</span></div>
+
+<div id="alertMatte" class="alert big" hidden>
+  <span data-en="<b>⚠ Advanced cutout unavailable on this computer.</b> Pascal is using the classic cutout: hair looks less natural."><b>⚠ Recorte avançado indisponível neste computador.</b> O Pascal está usando o recorte clássico: o cabelo fica menos natural.</span> <button id="btnMatteHow" class="small">Como resolver</button>
+</div>
+
+<div id="matteModal" class="modal" hidden>
+  <div class="modal-box">
+    <h2>⚠ O recorte avançado não está funcionando neste computador</h2>
+    <p data-en="The advanced cutout is what keeps the person's hair and edges natural. Without it, Pascal uses the <b>classic cutout</b>: it works, but the hair looks visibly worse.">O recorte avançado é o que deixa o cabelo e a borda da pessoa naturais. Sem ele, o Pascal usa o <b>recorte clássico</b>: funciona, mas o resultado fica visivelmente pior no cabelo.</p>
+    <div id="matteWhy" class="mwhy"></div>
+    <div id="matteTried" hidden><h3>O que o Pascal já tentou sozinho</h3><ul id="matteTriedList"></ul></div>
+    <h3>O que fazer</h3>
+    <ol id="matteSteps" class="msteps"></ol>
+    <div class="chkbar">
+      <button id="matteRetry" class="primary">Tentar de novo</button>
+      <button id="matteUnblock" class="soft">Desbloquear arquivos</button>
+      <button id="matteCopy" class="soft">Copiar relatório</button>
+      <button id="matteClose" class="ghost">Continuar com o recorte clássico</button>
+    </div>
+  </div>
+</div>
+
 <main>
   <aside>
     <section class="card step">
