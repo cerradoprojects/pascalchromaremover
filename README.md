@@ -77,11 +77,14 @@ Pascal\
   app.py  pipeline.py  matte_ai.py  matte_worker.py  recorte.py  diag.py  keepawake.py  ...
   web\                                 <- the interface
   python\                              <- Step 1 (portable Python + numpy + onnxruntime)
+  pacotes\py313\  pacotes\py314\       <- numpy + onnxruntime for an installed Python 3.13 / 3.14
   bin\                                 <- Step 2 (ffmpeg.exe, ffprobe.exe) and bin\rvm\ (the model)
   input\  output\  presets_usuario\  cache\  logs\     <- created on first run
 ```
 
 **Step 1 — Python.** Any Python 3.12 with `pip install numpy onnxruntime` works (`python app.py`). For the portable folder, download the *Windows embeddable package (64-bit)* from python.org, extract it into `python\`, put `numpy` and `onnxruntime` inside `python\Lib\site-packages`, and in `python\python312._pth` keep `import site` uncommented and add the line `Lib\site-packages`.
+
+**Locked-down corporate computers.** Some company PCs only allow programs from approved folders, so the portable `python.exe` is blocked. `Iniciar_Pascal.bat` (through `_acha_python.cmd`) then falls back to an installed Python (an `X:\Python` folder, the python.org installer, the Python install manager, `py`, `python`), and `pacotes.py` loads numpy + onnxruntime from `pacotes\py313` / `pacotes\py314` (wheels extracted as-is; to rebuild: `python -m pip download --only-binary=:all: --no-deps --python-version 3.13 --platform win_amd64 -d WHEELS numpy onnxruntime flatbuffers protobuf packaging`, then unzip every wheel into `pacotes\py313\`). The user only installs a plain Python; no pip, no internet.
 
 **Step 2 — FFmpeg and the model.**
 1. Get `ffmpeg-release-essentials.zip` from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) and copy `ffmpeg.exe` and `ffprobe.exe` into `bin\`.

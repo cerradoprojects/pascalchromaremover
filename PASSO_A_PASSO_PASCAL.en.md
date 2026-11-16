@@ -17,6 +17,8 @@ Pascal takes a video recorded in front of a green screen and delivers the finish
 
 > If Windows shows the warning "Windows protected your PC", click **More info** and then **Run anyway**. Pascal installs nothing.
 
+> **Work computer that blocks programs?** If the black window says "NAO CONSEGUI ABRIR O PYTHON" (couldn't open Python), install Python 3.13 or 3.14 64-bit (on corporate computers the installer is often in the `X:\Python` folder) and open Pascal again. The libraries already ship with Pascal: nothing else to install.
+
 ## 2. Choose the video (step 1 on screen)
 
 1. Click **Choose…** and select the video.

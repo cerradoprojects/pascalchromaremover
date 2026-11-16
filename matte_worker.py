@@ -8,8 +8,14 @@ import subprocess
 import sys
 import threading
 import time
+import os.path as _osp
 
-import numpy as np
+# numpy/onnxruntime: os do Python portátil ou os que o Pascal leva para Python 3.13/3.14 instalado no computador (pacotes.py)
+sys.path.insert(0, _osp.dirname(_osp.abspath(__file__)))
+import pacotes  # noqa: E402
+pacotes.ativar()
+
+import numpy as np  # noqa: E402
 
 try:                      # o modo --post-raw não precisa do modelo
     import onnxruntime as ort

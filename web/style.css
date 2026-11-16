@@ -166,6 +166,9 @@ nav#tabs button.on{background:linear-gradient(135deg,var(--pri),var(--pri2));col
 .ctl .val{color:var(--amb);font-variant-numeric:tabular-nums;font-weight:600}
 .ctl input[type=range]{width:100%;accent-color:var(--pri);margin:6px 0 2px}
 .ctl .help{color:var(--mute);font-size:12px}
+.ctl .advoff{display:none;color:#ff8a7a;font-size:12px;margin-top:4px}
+body.noadv .ctl .advoff{display:block}
+body.noadv .ctl:has(.advoff) input[type=range]{opacity:.45}
 .ctl .inl{display:flex;gap:8px;margin-top:6px;align-items:center}
 .ctl input[type=color]{width:46px;height:32px;border:1px solid var(--line);background:none;padding:0}
 .ctl.reset-able .top label::after{content:""}

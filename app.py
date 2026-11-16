@@ -667,6 +667,7 @@ def start_frame(path: str, at: float, raw: dict, orig: bool, seq: int) -> dict:
 
                     matte = None
                     matte_on, why = use_matte(s)
+                    job["matte_off"] = bool(why)        # a tela marca os ajustes "Recorte:" como sem efeito
                     if why:
                         job["warning"] = why
                     if matte_on:
@@ -713,6 +714,7 @@ def start_frame(path: str, at: float, raw: dict, orig: bool, seq: int) -> dict:
                                 # o recorte avançado falhou neste computador: o quadro fica com o recorte clássico (a prévia) e um aviso com o motivo
                                 log("recorte avançado do quadro falhou: " + str(e))
                                 matte = None
+                                job["matte_off"] = True
                                 job["warning"] = "O recorte avançado não funcionou neste computador; o quadro mostra o recorte clássico. Motivo: " + str(e)[:300]
                     job["message"] = "Aplicando cor, luz e fundo…"
                     if matte is None and job.get("quick") and (CACHE / job["quick"]).exists():

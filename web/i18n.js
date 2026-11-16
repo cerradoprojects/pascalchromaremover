@@ -120,6 +120,8 @@
     ["0 = cor estimada pelo recorte (fios mais marcados, risco de tom oliva); 1 = cor do vídeo (contorno mais liso). Padrão 0,3.", "0 = color estimated by the cutout (more defined strands, risk of an olive tint); 1 = video color (smoother outline). Default 0.3."],
     ["Recorte: força do tira-verde", "Cutout: green-removal strength"],
     ["Tira o verde que sobra nas pontas do cabelo e em sombras. Não mexe em pele nem em roupa clara.", "Removes the green left on hair tips and in shadows. Doesn't touch skin or light clothing."],
+    ["Sem efeito agora: o recorte avançado não está funcionando neste computador (veja Ajuda e perguntas › Verificar instalação). Para o verde no cabelo, use \"Tirar verde do cabelo e das sombras verdes\" e \"Remoção de reflexo verde\".",
+     "No effect right now: the advanced cutout isn't working on this computer (see Help & FAQ › Check installation). For green in the hair, use \"Remove green from hair and green shadows\" and \"Green spill removal\"."],
     ["Cor do verde (chroma)", "Green color (chroma)"],
     ["Automático mede o verde de cada vídeo (recomendado). Desmarque para escolher uma cor.", "Automatic measures the green of each video (recommended). Uncheck to pick a color."],
     ["Similaridade", "Similarity"],

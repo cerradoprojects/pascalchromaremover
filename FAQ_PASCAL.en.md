@@ -137,6 +137,19 @@ One at a time. Choose the video, render, and then choose the next. The settings 
 
 No. From version 1.0.2 on, Pascal carries the Microsoft Visual C++ files that the advanced cutout needs inside its own folder, and it runs on a regular login, without administrator rights. If you use an older version and the computer doesn't have C++, download the latest `Pascal.zip`.
 
+## I use Pascal on a work computer that blocks programs. What do I do?
+
+Some corporate computers don't let programs run from outside approved folders, so the Python that ships inside Pascal won't open. From version 1.0.3 on, Pascal handles this by itself:
+
+1. Install Python 3.13 or 3.14 (64-bit) the way your company allows (on many corporate computers the installer is in the `X:\Python` folder). You don't need to be an administrator.
+2. Open Pascal again with **Iniciar_Pascal.bat**. It finds the installed Python and the black window shows the line "Usando o Python instalado neste computador" (using the Python installed on this computer).
+
+**Nothing else to install.** The libraries the advanced cutout uses already ship inside Pascal (`pacotes` folder), ready for Python 3.12, 3.13 and 3.14. If Pascal can't find any Python, the black window explains what to do and opens the `X:\Python` folder if it exists. To check, open **Help & FAQ → Check installation**: the line "Advanced cutout available" shows which Python is in use.
+
+## The "Cutout:" settings don't change anything. Why?
+
+The settings that start with "Cutout:" and the "Hair edge style" only work with the advanced cutout. When the advanced cutout isn't working on the computer, Pascal uses the classic cutout and shows "No effect right now" under those settings. In that case, to remove green from the hair use **Remove green from hair and green shadows** and **Green spill removal**, and see the previous question to get the advanced cutout working.
+
 ## Can I use Pascal in English?
 
 Yes. At the top right of the window, click **EN** (and **PT** to go back to Portuguese). The screens, the FAQ and the step by step change language. The technical reports in the `logs` folder stay in Portuguese.

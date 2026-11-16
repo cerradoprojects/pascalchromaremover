@@ -137,6 +137,19 @@ Um de cada vez. Escolha o vídeo, renderize, e depois escolha o próximo. Os aju
 
 Não. A partir da versão 1.0.2 o Pascal já leva dentro da própria pasta os arquivos do Microsoft Visual C++ de que o recorte avançado precisa, e roda em um login comum, sem administrador. Se você usa uma versão mais antiga e o computador não tem o C++, baixe o `Pascal.zip` mais recente.
 
+## Uso o Pascal num computador do trabalho que bloqueia programas. O que faço?
+
+Alguns computadores corporativos não deixam abrir programas de fora das pastas autorizadas, e aí o Python que vem dentro do Pascal não abre. A partir da versão 1.0.3 o Pascal resolve isso sozinho:
+
+1. Instale o Python 3.13 ou 3.14 de 64 bits pelo caminho que a sua empresa libera (em muitos computadores corporativos o instalador fica na pasta `X:\Python`). Não precisa ser administrador.
+2. Abra o Pascal de novo pelo **Iniciar_Pascal.bat**. Ele acha o Python instalado e mostra na janela preta a linha "Usando o Python instalado neste computador".
+
+**Não precisa instalar mais nada.** As bibliotecas que o recorte avançado usa já vêm dentro do Pascal (pasta `pacotes`), prontas para o Python 3.12, 3.13 e 3.14. Se o Pascal não achar nenhum Python, a janela preta explica o que fazer e, se existir, abre a pasta `X:\Python`. Para conferir, abra **Ajuda e perguntas → Verificar instalação**: a linha "Recorte avançado disponível" mostra qual Python está sendo usado.
+
+## Os ajustes "Recorte:" não mudam nada. Por quê?
+
+Os ajustes que começam com "Recorte:" e o "Estilo da borda do cabelo" só valem no recorte avançado. Quando o recorte avançado não está funcionando no computador, o Pascal usa o recorte clássico e mostra, embaixo desses ajustes, o aviso "Sem efeito agora". Nesse caso, para tirar o verde do cabelo use **Tirar verde do cabelo e das sombras verdes** e **Remoção de reflexo verde**, e veja a pergunta anterior para fazer o recorte avançado funcionar.
+
 ## Posso usar o Pascal em inglês?
 
 Pode. No alto da janela, à direita, clique em **EN** (e em **PT** para voltar ao português). As telas, as perguntas frequentes e o passo a passo mudam de idioma. Os relatórios técnicos da pasta `logs` ficam em português.

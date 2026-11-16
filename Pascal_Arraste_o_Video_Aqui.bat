@@ -4,16 +4,13 @@ rem um .MOV ProRes 4444 com transparencia na pasta "output" (pronto para o Premi
 cd /d "%~dp0"
 title Pascal - recorte
 
-set "PY="
-if exist "%~dp0python\python.exe" set "PY=%~dp0python\python.exe"
+call "%~dp0_acha_python.cmd"
 if not defined PY (
-  where py >nul 2>nul && set "PY=py -3"
-)
-if not defined PY (
-  where python >nul 2>nul && set "PY=python"
-)
-if not defined PY (
-  echo NAO ACHEI O PYTHON. Veja o README.md.
+  echo.
+  echo  NAO CONSEGUI ABRIR O PYTHON. Instale o Python 3.13 ou 3.14 de 64 bits
+  echo  ^(em computador corporativo: pasta X:\Python^) e tente de novo.
+  echo  As bibliotecas ja vem com o Pascal: nao precisa instalar mais nada.
+  echo.
   pause
   exit /b 1
 )

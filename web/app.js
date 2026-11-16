@@ -111,6 +111,7 @@ const ESSENCIAL = ["light", "warmth", "contrast", "saturation", "gamma", "sharpe
   TABS.unshift({ id: "essencial", titulo: "⭐ Essencial", ctl: ESSENCIAL.filter((k) => all[k]).map((k) => all[k]) });
 })();
 
+const ADV_KEYS = new Set(["matte_style", "matte_mix", "matte_spill"]);     // só valem no recorte avançado
 const SLOW_KEYS = new Set(["matte_mix", "matte_spill", "matte_engine", "resolution", "mod_upscale", "chroma_color"]);
 
 let settings = {};
@@ -224,6 +225,13 @@ function buildControl(c) {
     const h = document.createElement("div");
     h.className = "help"; h.textContent = c.help;
     wrap.appendChild(h);
+  }
+  if (ADV_KEYS.has(c.k)) {
+    // aparece quando o recorte avançado não está funcionando neste computador (o ajuste não muda nada no recorte clássico)
+    const n = document.createElement("div");
+    n.className = "advoff";
+    n.textContent = "Sem efeito agora: o recorte avançado não está funcionando neste computador (veja Ajuda e perguntas › Verificar instalação). Para o verde no cabelo, use \"Tirar verde do cabelo e das sombras verdes\" e \"Remoção de reflexo verde\".";
+    wrap.appendChild(n);
   }
   (controls[c.k] = controls[c.k] || []).push(setter);
   return wrap;
@@ -400,6 +408,7 @@ async function runLive() {
     if (j.state === "done") {
       await showFrame(j.out_name, j);
       setNote(j.warning || "", !!j.warning);       // aviso, por exemplo: o recorte avançado não está disponível neste computador (e por quê)
+      document.body.classList.toggle("noadv", !!j.matte_off);
     } else if (j.state === "stale") {
       live.pending = true;        // um pedido mais novo tomou o lugar: refaz com os ajustes atuais
     } else if (j.state === "error") {

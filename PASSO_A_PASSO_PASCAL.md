@@ -17,6 +17,8 @@ O Pascal pega o vídeo gravado na frente do fundo verde e entrega o vídeo pront
 
 > Se o Windows mostrar o aviso "O Windows protegeu o computador", clique em **Mais informações** e depois em **Executar assim mesmo**. O Pascal não instala nada.
 
+> **Computador do trabalho que bloqueia programas?** Se a janela preta disser "NAO CONSEGUI ABRIR O PYTHON", instale o Python 3.13 ou 3.14 de 64 bits (em computador corporativo o instalador costuma ficar na pasta `X:\Python`) e abra o Pascal de novo. As bibliotecas já vêm com o Pascal: não precisa instalar mais nada.
+
 ## 2. Escolher o vídeo (passo 1 na tela)
 
 1. Clique em **Escolher…** e selecione o vídeo.

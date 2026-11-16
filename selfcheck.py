@@ -125,15 +125,24 @@ def run(base: Path, ffmpeg: str | None, ffprobe: str | None, out_dir: Path, brow
         items.append(_item("warn", ("Modelo do recorte avançado incompleto", f"{model.stat().st_size / 2**20:.0f} MB (o esperado é cerca de 100 MB).", "Baixe o Pascal.zip de novo."),
                            ("Advanced cutout model is incomplete", f"{model.stat().st_size / 2**20:.0f} MB (about 100 MB expected).", "Download Pascal.zip again.")))
     else:
-        py = base / "python" / "python.exe"
-        exe = str(py) if py.is_file() else sys.executable
+        import pacotes as PK
+        portable = str(base / "python" / "python.exe")
         try:
-            r = subprocess.run([exe, "-c", "import numpy, onnxruntime; print('numpy', numpy.__version__, '| onnxruntime', onnxruntime.__version__)"],
-                               capture_output=True, text=True, errors="replace", timeout=150, creationflags=CREATE_NO_WINDOW)
-            if r.returncode == 0:
-                items.append(_item("ok", ("Recorte avançado disponível", r.stdout.strip()), ("Advanced cutout available", r.stdout.strip())))
+            found, errs = None, []
+            for cmd in PK.candidatos(base):        # o portátil do Pascal, o que roda o programa, os instalados (X:\Python etc.)
+                ok, txt, ver, _b = PK.testar(cmd, base, timeout=150 if cmd[0] == portable else 60)
+                if ok:
+                    found = (cmd[0], txt, ver)
+                    break
+                if txt:
+                    errs.append((cmd[0], txt, ver))
+            if found:
+                where = f"Python {found[2]} · {found[0]}"
+                items.append(_item("ok", ("Recorte avançado disponível", f"{found[1]} ({where})"), ("Advanced cutout available", f"{found[1]} ({where})")))
             else:
-                err = (r.stderr.strip().splitlines() or ["?"])[-1][:200]
+                # o erro mais útil é o de um Python que abriu (tem versão); o "não abriu" fica de fallback
+                errs.sort(key=lambda e: 0 if e[2] else 1)
+                err = "; ".join(f"{t} ({c})" for c, t, _v in errs[:2])[:300] or "nenhum Python encontrado neste computador"
                 need_vc = any(k in err.upper() for k in ("DLL", "MSVCP", "VCRUNTIME", "ONNXRUNTIME_PYBIND"))
                 local_vc = (base / "python" / "msvcp140.dll").is_file()
                 act = ""
@@ -144,6 +153,11 @@ def run(base: Path, ffmpeg: str | None, ffprobe: str | None, out_dir: Path, brow
                 elif need_vc:
                     pre_pt = f"Extraia de novo o Pascal.zip mais recente (ele já leva os arquivos do C++) ou peça a quem administra o computador para instalar o \"Microsoft Visual C++ Redistributable\" (64 bits): {VC_URL} . "
                     pre_en = f"Extract the latest Pascal.zip again (it already carries the C++ files) or ask whoever administers the computer to install the \"Microsoft Visual C++ Redistributable\" (64-bit): {VC_URL} . "
+                elif not any(e[2] for e in errs) or "só para Python" in err or "64 bits" in err:
+                    pre_pt = ("O Python do Pascal não abriu (o computador pode bloquear programas fora das pastas autorizadas). Instale o Python 3.13 ou 3.14 de 64 bits "
+                              "(em computador corporativo o instalador costuma ficar numa pasta de programas liberados, por exemplo X:\\Python) e abra o Pascal de novo: os pacotes já vão dentro do Pascal, não precisa instalar mais nada. ")
+                    pre_en = ("Pascal's own Python did not open (the computer may block programs outside approved folders). Install Python 3.13 or 3.14 64-bit "
+                              "and open Pascal again: the packages already ship inside Pascal, nothing else to install. ")
                 else:
                     pre_pt = pre_en = ""
                 items.append(_item("warn", ("Recorte avançado indisponível neste computador", err, pre_pt + "Enquanto isso o Pascal usa o recorte clássico (mais rápido, menos natural no cabelo)."),

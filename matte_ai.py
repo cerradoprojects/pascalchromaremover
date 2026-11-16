@@ -10,11 +10,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pacotes as PK
 import pipeline as P
 
 MODEL_NAME = "rvm_resnet50_fp32.onnx"
 MODEL_URL = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/" + MODEL_NAME
-HOW_TO = (f"Detalhe técnico (só para quem monta a pasta): baixe {MODEL_URL} para bin\\rvm\\ ; o Python precisa de numpy e onnxruntime (python\\Lib\\site-packages).")
+HOW_TO = (f"Detalhe técnico (só para quem monta a pasta): baixe {MODEL_URL} para bin\\rvm\\ ; numpy e onnxruntime vão em python\\Lib\\site-packages "
+          "(Python 3.12 do Pascal) ou em pacotes\\py313 / pacotes\\py314 (Python instalado no computador).")
 
 _PY_CACHE: dict[str, str | None] = {}
 _PY_ERR = {"msg": ""}          # última linha do erro ao importar numpy/onnxruntime (para dizer o motivo na tela)
@@ -36,37 +38,29 @@ def find_model(base: Path) -> Path | None:
     return None
 
 
-def find_python(base: Path) -> str | None:
-    """Primeiro Python que consegue importar numpy e onnxruntime (o portátil, o que roda o programa, o do sistema)."""
+def find_python(base: Path) -> list[str] | None:
+    """Comando do primeiro Python que consegue importar numpy e onnxruntime com os pacotes do Pascal (ver pacotes.py):
+    o portátil, o que roda o programa e os instalados no computador (inclusive a pasta X:/Python, usada em computadores corporativos)."""
     if "py" in _PY_CACHE:
         return _PY_CACHE["py"]
     portable = str(base / "python" / "python.exe")
-    cands = [portable, sys.executable, shutil.which("python") or "", shutil.which("py") or ""]
     found = None
     timed_out = False
-    first_err = ""
-    tried: set[str] = set()
-    for c in cands:
+    errs: list[str] = []
+    for cmd in PK.candidatos(base):
         try:
-            key = c.lower().replace("/", "\\")
-            if not c or key in tried or "\\windowsapps\\" in key or not Path(c).exists():      # atalho da Microsoft Store (só abre a loja) não serve
-                continue
-            tried.add(key)
-            cmd = [c, "-3"] if Path(c).stem.lower() == "py" else [c]
-            # o Python do Pascal: tempo folgado (na 1ª vez o antivírus pode examinar os pacotes por vários segundos); os de fora: pouco
-            r = subprocess.run(cmd + ["-c", "import numpy, onnxruntime"], capture_output=True, text=True, errors="replace",
-                               timeout=240 if c == portable else 30, creationflags=P.CREATE_NO_WINDOW)
+            # o Python do Pascal: tempo folgado (na 1ª vez o antivírus pode examinar os pacotes por vários segundos); os de fora: 60 s
+            ok, txt, ver, _bits = PK.testar(cmd, base, timeout=240 if cmd[0] == portable else 60)
         except subprocess.TimeoutExpired:
             timed_out = True
             continue
-        except (OSError, ValueError):
-            continue
-        if r.returncode == 0:
-            found = " ".join(cmd)
+        if ok:
+            found = cmd
             break
-        if not first_err:
-            first_err = (r.stderr.strip().splitlines() or [""])[-1][:200]
-    _PY_ERR["msg"] = "" if found else first_err
+        if txt:
+            errs.append((f"Python {ver}: " if ver and not txt.startswith("Python") else "") + txt)
+    # o motivo mais útil: o de um Python que abriu (tem versão) vem antes do "não abriu" do portátil bloqueado
+    _PY_ERR["msg"] = "" if found else " · ".join(errs[:3])[:400]
     if found or not timed_out:          # demora não é resposta: não guarda "não achei" e tenta de novo no próximo quadro
         _PY_CACHE["py"] = found
     return found
@@ -94,7 +88,7 @@ def generate(ffmpeg: str, base: Path, src: str, s: dict, info: dict, start: floa
     tw, th = P.target_size(info, s, False)    # o recorte já sai em 1080p (vertical ou horizontal)
     dur = length if length > 0 else max(0.1, (info["duration"] or 1.0) - start)
     total = max(1, int(round(dur * info["fps"])))
-    cmd = py.split() + [str(Path(__file__).with_name("matte_worker.py")), "--ffmpeg", ffmpeg, "--src", src, "--start", f"{start:.3f}",
+    cmd = py + [str(Path(__file__).with_name("matte_worker.py")), "--ffmpeg", ffmpeg, "--src", src, "--start", f"{start:.3f}",
                         "--length", f"{length:.3f}", "--width", str(tw), "--height", str(th), "--fps", info["fps_str"],
                         "--model", str(model), "--out-color", str(out_c), "--out-alpha", str(out_a),
                         "--mix", f"{float(s.get('matte_mix', 0.3)):.3f}", "--spill", f"{float(s.get('matte_spill', 1.0)):.3f}",
@@ -131,7 +125,7 @@ def error_tail(text: str) -> str:
 
 def _run_worker(args: list[str], what: str) -> tuple[bool, str]:
     py = find_python(Path(__file__).parent)
-    cmd = py.split() + [str(Path(__file__).with_name("matte_worker.py"))] + args
+    cmd = py + [str(Path(__file__).with_name("matte_worker.py"))] + args
     r = subprocess.run(cmd, capture_output=True, text=True, errors="replace", creationflags=P.CREATE_NO_WINDOW)
     if r.returncode != 0:
         return False, f"{what} falhou: {error_tail(r.stdout + chr(10) + r.stderr)}"

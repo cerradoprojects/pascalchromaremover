@@ -10,4 +10,5 @@ pascal_config.json
 # o que é pesado vai no zip da Release, não no git (ver README)
 bin/
 python/
+pacotes/py3*/
 *.zip

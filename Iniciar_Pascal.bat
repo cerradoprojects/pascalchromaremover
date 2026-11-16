@@ -1,31 +1,42 @@
 @echo off
 rem Pascal - inicia o programa (nao precisa ser administrador).
-rem Usa o Python portatil da pasta "python" e o FFmpeg da pasta "bin".
+rem Usa o Python portatil da pasta "python" (ou, se o computador bloquear, um Python instalado) e o FFmpeg da pasta "bin".
 cd /d "%~dp0"
 title Pascal
 
-set "PY="
-if exist "%~dp0python\python.exe" set "PY=%~dp0python\python.exe"
-if not defined PY (
-  where py >nul 2>nul && set "PY=py -3"
-)
-if not defined PY (
-  where python >nul 2>nul && set "PY=python"
-)
+echo  Abrindo o Pascal...
+call "%~dp0_acha_python.cmd"
 if not defined PY (
   echo.
-  echo  NAO ACHEI O PYTHON.
-  echo  Siga o README.md: baixe o "Python embeddable" e solte o conteudo na pasta "python".
+  echo  ============================================================
+  echo   NAO CONSEGUI ABRIR O PYTHON
+  echo  ============================================================
+  echo   O Python que vem com o Pascal foi bloqueado por este computador
+  echo   e nao achei outro Python instalado.
   echo.
-  pause
+  echo   Resolva assim, uma vez so:
+  echo    1. Instale o Python 3.13 ou 3.14 de 64 bits.
+  echo       Em computador corporativo, o instalador costuma ficar na pasta X:\Python.
+  echo    2. Abra o Pascal de novo.
+  echo.
+  echo   Nao precisa instalar mais nada: as bibliotecas ja vem com o Pascal.
+  echo.
+  if exist "X:\Python\" (
+    echo   Aperte qualquer tecla para abrir a pasta X:\Python.
+    pause >nul
+    start "" explorer "X:\Python"
+  ) else (
+    pause
+  )
   exit /b 1
 )
+if defined PY_FORA echo  Usando o Python instalado neste computador: %PY%
 
 if not exist "%~dp0bin\ffmpeg.exe" (
   if not exist "%~dp0bin\bin\ffmpeg.exe" (
     echo.
     echo  AVISO: ffmpeg.exe nao esta na pasta "bin". O programa abre, mas nao consegue processar video.
-    echo  Siga o README.md, passo 2.
+    echo  Baixe o Pascal.zip completo da pagina Releases do GitHub.
     echo.
   )
 )
@@ -36,4 +47,3 @@ if errorlevel 1 (
   echo  O programa fechou com erro. Detalhes em: %~dp0cache\app.log
   pause
 )
-
