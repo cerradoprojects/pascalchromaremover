@@ -11,4 +11,5 @@ pascal_config.json
 bin/
 python/
 pacotes/py3*/
+pacotes/ort_alt_*/
 *.zip

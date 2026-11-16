@@ -81,7 +81,7 @@ def matte_steps(kind: str, lang: str, base: Path) -> list:
 
 def auto_reparo(base: Path, notify=lambda m: None) -> list:
     """Tenta consertar o recorte avançado sozinho, sem administrador. Devolve o que tentou: lista de {"pt","en","ok"}.
-    1) tira a marca de "baixado da internet"; 2) se o Python abre mas cai ao carregar os pacotes, deixa de usar as cópias do C++ da pasta python
+    1) tira a marca de "baixado da internet"; 2) usa um onnxruntime mais antigo (antivírus que injeta C++ antigo); 3) se o Python abre mas cai ao carregar os pacotes, deixa de usar as cópias do C++ da pasta python
     (o Windows já tem as dele) e testa de novo — desfaz se não ajudar."""
     import matte_ai as MA
     import pacotes as PK
@@ -112,7 +112,27 @@ def auto_reparo(base: Path, notify=lambda m: None) -> list:
         anota("Tirei a marca de \"baixado da internet\" dos arquivos e testei de novo.", "Removed the \"downloaded from the internet\" mark from the files and tested again.", ok)
         if ok:
             return feitos
-    # 2) cópias locais do C++ atrapalhando
+    # 2) antivírus que injeta uma msvcp140.dll antiga no Python (ex.: Trellix/McAfee): usa um onnxruntime mais antigo, que aguenta
+    flag = base / "cache" / "ort_alt.flag"
+    if (base / "pacotes" / "ort_alt_py312").is_dir() or (base / "pacotes" / "ort_alt_py313").is_dir():
+        notify("Testando uma versão mais antiga do recorte avançado…")
+        try:
+            flag.parent.mkdir(exist_ok=True)
+            flag.write_text("onnxruntime antigo", encoding="utf-8")
+            ok = refaz()
+        except OSError:
+            ok = False
+        if ok:
+            anota("Algo neste computador (provavelmente o antivírus) derruba a versão nova do recorte avançado; passei a usar uma versão mais antiga, que funciona.",
+                  "Something on this computer (probably the antivirus) crashes the new version of the advanced cutout; switched to an older version, which works.", True)
+            return feitos
+        try:
+            flag.unlink()
+        except OSError:
+            pass
+        refaz()
+        anota("Tentei uma versão mais antiga do recorte avançado: também não funcionou.", "Tried an older version of the advanced cutout: it didn't work either.", False)
+    # 3) cópias locais do C++ atrapalhando
     sysdir = Path(os.environ.get("SystemRoot") or r"C:\Windows") / "System32"
     local = base / "python"
     off = local / "_cpp_off"
@@ -145,7 +165,7 @@ def auto_reparo(base: Path, notify=lambda m: None) -> list:
                 except OSError:
                     pass
             anota(f"Não consegui testar o C++ do Windows ({str(e)[:80]}).", f"Couldn't test Windows' C++ ({str(e)[:80]}).", False)
-    # 3) procurou outros Pythons no computador (feito dentro de find_python)
+    # 4) procurou outros Pythons no computador (feito dentro de find_python)
     outros = [c for c in PK.candidatos(base) if Path(c[0]) != portable]
     anota(f"Procurei outros Pythons neste computador ({len(outros)} lugar(es) testado(s)): nenhum serviu.",
           f"Looked for other Pythons on this computer ({len(outros)} place(s) tested): none worked.", False)

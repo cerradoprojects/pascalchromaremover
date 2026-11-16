@@ -47,6 +47,17 @@ def pasta(base: Path = BASE, ver: tuple = None) -> Path | None:
     return None
 
 
+def onnx_antigo(base: Path = BASE) -> Path | None:
+    """Pasta com um onnxruntime mais ANTIGO, usada só quando `cache/ort_alt.flag` existe (criado pelo conserto automático).
+    Motivo: antivírus como o Trellix/McAfee injetam no Python a própria msvcp140.dll de 2016; o onnxruntime novo cai (0xC0000005)
+    dentro dela, o 1.19.2/1.20 (feito com um C++ mais antigo) não."""
+    if not (base / "cache" / "ort_alt.flag").is_file():
+        return None
+    maj, mi = sys.version_info[:2]
+    d = base / "pacotes" / f"ort_alt_py{maj}{mi}"
+    return d if (d / "onnxruntime").is_dir() else None
+
+
 def ativar(base: Path = BASE) -> Path | None:
     """Deixa `import numpy, onnxruntime` funcionar neste Python. Devolve a pasta usada (ou None)."""
     if sys.maxsize <= 2**32:          # Python de 32 bits: os pacotes são de 64
@@ -54,6 +65,9 @@ def ativar(base: Path = BASE) -> Path | None:
     p = pasta(base)
     if p and str(p) not in sys.path:
         sys.path.insert(0, str(p))
+    alt = onnx_antigo(base)
+    if alt and str(alt) not in sys.path:
+        sys.path.insert(0, str(alt))          # onnxruntime mais antigo, na frente (ver onnx_antigo)
     # o onnxruntime precisa do C++ da Microsoft (msvcp140.dll). Se o Windows não tem, usa a cópia que vai na pasta python do Pascal.
     sys32 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "msvcp140.dll"
     local = base / "python"
