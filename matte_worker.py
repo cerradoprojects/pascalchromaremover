@@ -48,8 +48,9 @@ def despill(fg: np.ndarray, a: np.ndarray, strength: float) -> np.ndarray:
     y = 0.2126 * r + 0.7152 * g + 0.0722 * b
     m = ((a > 0.02) & (a < 0.98)).astype(np.float32)
     edge = box(box(m, 3), 3) * 3.0
-    dark = np.clip((0.45 - y) / 0.25, 0.0, 1.0)
-    w = np.clip(np.maximum(edge, dark), 0.0, 1.0) * strength
+    s2 = max(0.0, strength - 1.0)                 # acima de 1: alcança cabelo mais claro e mais longe da borda
+    dark = np.clip((0.45 + 0.20 * s2 - y) / 0.25, 0.0, 1.0)
+    w = np.clip(np.maximum(edge * (1.0 + 2.0 * s2), dark), 0.0, 1.0) * min(1.0, strength)
     out = fg.copy()
     out[..., 1] = g - spill * w
     return out
@@ -196,8 +197,9 @@ def edge_colors(orig: np.ndarray, fgr: np.ndarray, alpha: np.ndarray, mix: float
     kappa = k_l * conf_l + (1.0 - conf_l) * k_r
     conf = np.maximum(conf_l, conf_r)
     wz = np.clip(2.0 * (1.0 - f_core), 0.0, 1.0)[qy, qx] * bgw_a[qy, qx]
-    allowed = np.maximum(np.maximum(f1[:, 0], f1[:, 2]), 0.02) * kappa * head
-    f1[:, 1] -= np.maximum(0.0, f1[:, 1] - allowed) * conf * wz * spill
+    s2 = max(0.0, spill - 1.0)                    # acima de 1: a folga sobre o verde do miolo encolhe (1,06 -> 1,00 em 2,0)
+    allowed = np.maximum(np.maximum(f1[:, 0], f1[:, 2]), 0.02) * kappa * (head - 0.06 * s2)
+    f1[:, 1] -= np.maximum(0.0, f1[:, 1] - allowed) * np.clip(conf * wz * (1.0 + s2), 0.0, 1.0) * min(1.0, spill)
     out[ys, xs] = f1
     return out
 
@@ -219,8 +221,9 @@ def despill_fast(fg: np.ndarray, a: np.ndarray, strength: float) -> np.ndarray:
     m = ((a > 0.02) & (a < 0.98)).astype(np.float32)
     edge_q = box(box(down(m), 1), 1) * 3.0
     e = edge_q[(idx // W) // Q, (idx % W) // Q]
-    dark = np.clip((0.45 - y) / 0.25, 0.0, 1.0)
-    w = np.clip(np.maximum(e, dark), 0.0, 1.0) * strength
+    s2 = max(0.0, strength - 1.0)                 # acima de 1: alcança cabelo mais claro e mais longe da borda
+    dark = np.clip((0.45 + 0.20 * s2 - y) / 0.25, 0.0, 1.0)
+    w = np.clip(np.maximum(e * (1.0 + 2.0 * s2), dark), 0.0, 1.0) * min(1.0, strength)
     c[:, 1] = g - spill * w
     flat[idx] = c
     return out

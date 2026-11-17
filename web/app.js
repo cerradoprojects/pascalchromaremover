@@ -27,8 +27,9 @@ const TABS = [
     { k: "bg_mode", t: "select", label: "Modo de saída do fundo", opts: [
       ["studio_mp4", "Fundo Preto de Estúdio (.MP4)"],
       ["alpha_prores", "Fundo Transparente para Premiere (.MOV ProRes 4444)"],
-      ["alpha_qtrle", "Fundo Transparente Leve (.MOV QTRLE)"]],
-      help: "ProRes 4444 é o melhor para o Premiere; QTRLE gera arquivo menor." },
+      ["alpha_png", "Fundo Transparente — sequência de imagens PNG + áudio .WAV (abre em qualquer Premiere)"],
+      ["alpha_qtrle", "Fundo Transparente QTRLE (.MOV Animation, arquivo maior)"]],
+      help: "ProRes 4444 é o melhor para o Premiere atual. Se o Premiere disser \"arquivo não suportado\" e abrir só o áudio (Premiere antigo ou sem o decodificador ProRes), use a sequência PNG: ela abre em qualquer versão." },
     { k: "bg_style", t: "select", label: "Estilo do fundo de estúdio (modo MP4)", opts: [
       ["preto", "Preto de estúdio liso (natural, recomendado)"], ["feixe", "Preto com feixe de luz diagonal (estilo do alvo)"], ["halo", "Preto com brilho suave atrás da pessoa (pode parecer auréola)"]],
       help: "Só vale quando a saída é MP4 com fundo de estúdio." },
@@ -39,36 +40,36 @@ const TABS = [
       ["simples", "Simples (novo): contorno limpo e cabelo escuro sem buracos"], ["partes", "Por partes do corpo (versão anterior)"]],
       help: "Troque e compare no quadro ao vivo (leva 1 a 2 segundos). Nos dois estilos o vídeo final segura as piscadas claras do cabelo." },
     { k: "matte_mix", t: "range", label: "Recorte: cor original na borda do cabelo", min: 0, max: 1, step: 0.05, help: "0 = cor estimada pelo recorte (fios mais marcados, risco de tom oliva); 1 = cor do vídeo (contorno mais liso). Padrão 0,3." },
-    { k: "matte_spill", t: "range", label: "Recorte: força do tira-verde", min: 0, max: 1, step: 0.05, help: "Tira o verde que sobra nas pontas do cabelo e em sombras. Não mexe em pele nem em roupa clara." },
+    { k: "matte_spill", t: "range", label: "Recorte: força do tira-verde", min: 0, max: 2, step: 0.05, help: "Tira o verde que sobra nas pontas do cabelo e em sombras. Não mexe em pele nem em roupa clara. Acima de 1 alcança cabelo mais claro e mais longe da borda (roupa verde ou oliva pode ficar mais cinza)." },
     { k: "chroma_color", t: "color", label: "Cor do verde (chroma)", help: "Automático mede o verde de cada vídeo (recomendado). Desmarque para escolher uma cor." },
-    { k: "similarity", t: "range", label: "Similaridade", min: 0.01, max: 0.40, step: 0.01, help: "Quanto some. Sobe se sobrar verde no fundo; desce se o sujeito ficar furado ou transparente." },
-    { k: "blend", t: "range", label: "Suavidade da borda", min: 0, max: 0.20, step: 0.01, help: "Transição suave entre o que some e o que fica." },
-    { k: "despill", t: "range", label: "Remoção de reflexo verde", min: 0, max: 1, step: 0.05, help: "Age só na faixa estreita da borda. O rosto e a roupa não são tocados." },
-    { k: "hair_despill", t: "range", label: "Tirar verde do cabelo e das sombras verdes", min: 0, max: 1, step: 0.05, help: "Neutraliza o tom esverdeado do cabelo (reflexo do fundo). A pele e a roupa clara/oliva não são tocadas. 0 desliga." },
+    { k: "similarity", t: "range", label: "Similaridade", min: 0.01, max: 0.50, step: 0.01, help: "Quanto some. Sobe se sobrar verde no fundo; desce se o sujeito ficar furado ou transparente." },
+    { k: "blend", t: "range", label: "Suavidade da borda", min: 0, max: 0.30, step: 0.01, help: "Transição suave entre o que some e o que fica." },
+    { k: "despill", t: "range", label: "Remoção de reflexo verde", min: 0, max: 2, step: 0.05, help: "Age na faixa da borda e nos tons escuros. Acima de 0,85 alcança verde mais fraco; no máximo pode acinzentar roupa verde." },
+    { k: "hair_despill", t: "range", label: "Tirar verde do cabelo e das sombras verdes", min: 0, max: 2, step: 0.05, help: "Neutraliza o tom esverdeado do cabelo (reflexo do fundo). A pele e a roupa clara/oliva não são tocadas. 0 desliga." },
     { k: "edge_shade", t: "range", label: "Sombra na borda do cabelo", min: 0, max: 1, step: 0.05, help: "Escurece em degradê só o contorno (cabelo e ombros): some a bordinha clara. 0 desliga." },
-    { k: "edge_soft", t: "range", label: "Suavidade do contorno", min: 0, max: 3, step: 0.1, unit: " px", help: "Degradê de transparência na ponta do cabelo: menos \"recortado\". 0 = bem definido." },
-    { k: "hair_speckle", t: "range", label: "Apagar pontinhos claros no cabelo", min: 0, max: 1, step: 0.05, help: "Escurece pixels claros soltos no meio do cabelo (entregam o chroma key). 0 desliga." },
-    { k: "edge_width", t: "range", label: "Largura da faixa de borda", min: 1, max: 12, step: 1, unit: " px", help: "Quão larga é a faixa onde o reflexo verde é corrigido (cabelo fino pede mais)." },
-    { k: "choke", t: "range", label: "Encolher / limpar borda (choke)", min: 0, max: 5, step: 1, unit: " px", help: "Remove a linha verde fina ao redor de ombros e cabelo." },
+    { k: "edge_soft", t: "range", label: "Suavidade do contorno", min: 0, max: 6, step: 0.1, unit: " px", help: "Degradê de transparência na ponta do cabelo: menos \"recortado\". 0 = bem definido." },
+    { k: "hair_speckle", t: "range", label: "Apagar pontinhos claros no cabelo", min: 0, max: 2, step: 0.05, help: "Escurece pixels claros soltos no meio do cabelo (entregam o chroma key). 0 desliga." },
+    { k: "edge_width", t: "range", label: "Largura da faixa de borda", min: 1, max: 20, step: 1, unit: " px", help: "Quão larga é a faixa onde o reflexo verde é corrigido (cabelo fino pede mais)." },
+    { k: "choke", t: "range", label: "Encolher / limpar borda (choke)", min: 0, max: 10, step: 1, unit: " px", help: "Remove a linha verde fina ao redor de ombros e cabelo." },
     { k: "isolate", t: "check", label: "Apagar o que estiver ligado às bordas do quadro (parede, caixa, rebatedor, suporte)", help: "Só apaga o que encosta nas laterais ou no topo. A pessoa não é tocada." },
-    { k: "clean", t: "range", label: "Descartar itens isolados (microfone, suporte)", min: 0, max: 20, step: 1, unit: " px", help: "Apaga objetos finos soltos no quadro. Se sumirem dedos ou fios de cabelo, diminua. 0 desliga." },
-    { k: "trim", t: "range", label: "Descartar cantos do quadro", min: 0, max: 10, step: 0.5, unit: " %", help: "Apaga uma faixa nas laterais e no topo (onde costumam aparecer suportes). A parte de baixo não é tocada." },
+    { k: "clean", t: "range", label: "Descartar itens isolados (microfone, suporte)", min: 0, max: 30, step: 1, unit: " px", help: "Apaga objetos finos soltos no quadro. Se sumirem dedos ou fios de cabelo, diminua. 0 desliga." },
+    { k: "trim", t: "range", label: "Descartar cantos do quadro", min: 0, max: 20, step: 0.5, unit: " %", help: "Apaga uma faixa nas laterais e no topo (onde costumam aparecer suportes). A parte de baixo não é tocada." },
   ]},
   { id: "luz", titulo: "Luz e cor", ctl: [
     { k: "auto_exposure", t: "check", label: "Exposição automática (mede o rosto e ajusta o brilho)" },
-    { k: "light", t: "range", label: "Luz de estúdio no sujeito", min: 0, max: 1, step: 0.05, help: "Dá volume: um lado do corpo e a parte de baixo ficam mais escuros, o rosto fica em destaque. 0 desliga." },
+    { k: "light", t: "range", label: "Luz de estúdio no sujeito", min: 0, max: 1.5, step: 0.05, help: "Dá volume: um lado do corpo e a parte de baixo ficam mais escuros, o rosto fica em destaque. 0 desliga." },
     { k: "light_dir", t: "select", label: "Lado de onde vem a luz principal", opts: [["left", "Esquerda (sombra à direita)"], ["right", "Direita (sombra à esquerda)"]] },
     { k: "rim", t: "range", label: "Luz de recorte (contorno)", min: 0, max: 1, step: 0.05, help: "Brilho fino no contorno do lado oposto à luz. Se parecer artificial, deixe em 0." },
-    { k: "warmth", t: "range", label: "Temperatura / aquecimento", min: 0, max: 40, step: 1, unit: " %", help: "Tira o aspecto branco/azulado de escritório." },
-    { k: "contrast", t: "range", label: "Contraste de estúdio", min: 0.8, max: 1.6, step: 0.01 },
-    { k: "gamma", t: "range", label: "Sombras (gamma)", min: 0.7, max: 1.3, step: 0.01, help: "Ajuste fino somado à exposição automática. Abaixo de 1 escurece." },
-    { k: "brightness", t: "range", label: "Brilho geral", min: -0.2, max: 0.2, step: 0.01 },
-    { k: "saturation", t: "range", label: "Saturação de pele", min: 0.5, max: 1.6, step: 0.01 },
-    { k: "highlights", t: "range", label: "Brilho superior / highlights", min: 0, max: 1, step: 0.05, help: "Ganho leve nos tons altos, sem estourar." },
-    { k: "black_point", t: "range", label: "Densidade do preto (anti-lavado)", min: 0, max: 0.06, step: 0.005, help: "Ancora o preto: cabelo e sombras ficam densos. Só escurece o preto; não clareia nada. 0 desliga." },
-    { k: "black_lift", t: "range", label: "Preto menos preto (níveis)", min: 0, max: 0.08, step: 0.005, help: "Levanta o preto do sujeito (cabelo) sem clarear o fundo. Como o \"níveis de saída\" do Photoshop." },
-    { k: "white_soft", t: "range", label: "Branco menos branco (níveis)", min: 0, max: 0.08, step: 0.005, help: "Abaixa o branco do sujeito." },
-    { k: "grain", t: "range", label: "Grão fino de cinema", min: 0, max: 6, step: 0.5, help: "Evita faixas no fundo escuro. 0 desliga." },
+    { k: "warmth", t: "range", label: "Temperatura / aquecimento", min: 0, max: 60, step: 1, unit: " %", help: "Tira o aspecto branco/azulado de escritório." },
+    { k: "contrast", t: "range", label: "Contraste de estúdio", min: 0.6, max: 2, step: 0.01 },
+    { k: "gamma", t: "range", label: "Sombras (gamma)", min: 0.5, max: 2, step: 0.01, help: "Ajuste fino somado à exposição automática. Abaixo de 1 escurece." },
+    { k: "brightness", t: "range", label: "Brilho geral", min: -0.4, max: 0.4, step: 0.01 },
+    { k: "saturation", t: "range", label: "Saturação de pele", min: 0, max: 2.5, step: 0.01 },
+    { k: "highlights", t: "range", label: "Brilho superior / highlights", min: 0, max: 2, step: 0.05, help: "Ganho leve nos tons altos, sem estourar." },
+    { k: "black_point", t: "range", label: "Densidade do preto (anti-lavado)", min: 0, max: 0.12, step: 0.005, help: "Ancora o preto: cabelo e sombras ficam densos. Só escurece o preto; não clareia nada. 0 desliga." },
+    { k: "black_lift", t: "range", label: "Preto menos preto (níveis)", min: 0, max: 0.15, step: 0.005, help: "Levanta o preto do sujeito (cabelo) sem clarear o fundo. Como o \"níveis de saída\" do Photoshop." },
+    { k: "white_soft", t: "range", label: "Branco menos branco (níveis)", min: 0, max: 0.15, step: 0.005, help: "Abaixa o branco do sujeito." },
+    { k: "grain", t: "range", label: "Grão fino de cinema", min: 0, max: 10, step: 0.5, help: "Evita faixas no fundo escuro. 0 desliga." },
   ]},
   { id: "nitidez", titulo: "Nitidez e tamanho", ctl: [
     { k: "resolution", t: "select", label: "Resolução final", opts: [
@@ -81,9 +82,9 @@ const TABS = [
       ["realesr-animevideov3", "Rápido (tende a alisar a pele — use a mistura)"],
       ["realesrgan-x4plus", "Natural (foto real, mais fiel, bem mais lento)"]] },
     { k: "ai_blend", t: "range", label: "Mistura da ampliação avançada", min: 0, max: 1, step: 0.05, help: "Quanto da ampliação avançada entra no resultado; o resto é o original ampliado pelo modo Rápido. 60% devolve fios de cabelo, cílios e tecido sem a cara de plástico." },
-    { k: "clarity", t: "range", label: "Pegada / contraste local", min: 0, max: 1, step: 0.05, help: "Realça textura e volume (tecido, cabelo, pele). Alto demais cria halos." },
+    { k: "clarity", t: "range", label: "Pegada / contraste local", min: 0, max: 2, step: 0.05, help: "Realça textura e volume (tecido, cabelo, pele). Alto demais cria halos." },
     { k: "sharp_method", t: "select", label: "Tipo de nitidez", opts: [["cas", "CAS (adaptativa)"], ["unsharp", "Unsharp (clássica)"]] },
-    { k: "sharpen", t: "range", label: "Nitidez", min: 0, max: 1, step: 0.05, help: "0,45 melhora a definição sem ficar artificial." },
+    { k: "sharpen", t: "range", label: "Nitidez", min: 0, max: 2, step: 0.05, help: "0,45 melhora a definição sem ficar artificial." },
     { k: "denoise", t: "select", label: "Redução de ruído de imagem", opts: [["off", "Desligada"], ["leve", "Leve"], ["medio", "Média"], ["forte", "Forte"]],
       help: "Roda antes do recorte: deixa a borda do recorte estável." },
   ]},
@@ -91,15 +92,15 @@ const TABS = [
     { k: "a_nr", t: "range", label: "Redução de ruído de fundo", min: 0, max: 100, step: 5, unit: " %", help: "Tira o chiado e o ruído constante da sala (filtro de wavelets). 0 desliga." },
     { k: "a_gate", t: "check", label: "Reduzir eco / cauda de sala entre as palavras" },
     { k: "a_room", t: "range", label: "Intensidade da redução de eco", min: 0, max: 100, step: 5, unit: " %", help: "Quanto mais alto, mais o som fraco entre as palavras (onde fica o eco) é abafado." },
-    { k: "a_highpass", t: "range", label: "Corte de graves (rumble)", min: 20, max: 200, step: 5, unit: " Hz" },
+    { k: "a_highpass", t: "range", label: "Corte de graves (rumble)", min: 20, max: 400, step: 5, unit: " Hz" },
     { k: "a_lowpass", t: "range", label: "Corte de agudos (chiado)", min: 8000, max: 20000, step: 500, unit: " Hz" },
-    { k: "a_body", t: "range", label: "Corpo da voz (180 Hz)", min: -6, max: 8, step: 0.5, unit: " dB" },
-    { k: "a_boxy", t: "range", label: "Tirar som de sala pequena (380 Hz)", min: -8, max: 4, step: 0.5, unit: " dB" },
-    { k: "a_presence", t: "range", label: "Presença e clareza (3,5 kHz)", min: -6, max: 8, step: 0.5, unit: " dB" },
-    { k: "a_air", t: "range", label: "Brilho / ar (9 kHz)", min: -6, max: 6, step: 0.5, unit: " dB" },
+    { k: "a_body", t: "range", label: "Corpo da voz (180 Hz)", min: -12, max: 12, step: 0.5, unit: " dB" },
+    { k: "a_boxy", t: "range", label: "Tirar som de sala pequena (380 Hz)", min: -12, max: 6, step: 0.5, unit: " dB" },
+    { k: "a_presence", t: "range", label: "Presença e clareza (3,5 kHz)", min: -12, max: 12, step: 0.5, unit: " dB" },
+    { k: "a_air", t: "range", label: "Brilho / ar (9 kHz)", min: -12, max: 12, step: 0.5, unit: " dB" },
     { k: "a_comp", t: "check", label: "Compressor dinâmico (nivela a voz)" },
     { k: "a_loudnorm", t: "check", label: "Normalizar volume (padrão broadcast)" },
-    { k: "a_lufs", t: "range", label: "Volume final (LUFS)", min: -23, max: -10, step: 1, help: "-14 é o padrão de internet; -16 é mais suave." },
+    { k: "a_lufs", t: "range", label: "Volume final (LUFS)", min: -30, max: -9, step: 1, help: "-14 é o padrão de internet; -16 é mais suave." },
   ]},
 ];
 
@@ -258,7 +259,7 @@ MODS.forEach((k) => {
 });
 $("transp").onchange = () => {
   settings.bg_mode = $("transp").checked
-    ? (settings.bg_mode === "alpha_qtrle" ? "alpha_qtrle" : "alpha_prores") : "studio_mp4";
+    ? (["alpha_qtrle", "alpha_png"].includes(settings.bg_mode) ? settings.bg_mode : "alpha_prores") : "studio_mp4";
   syncAll("bg_mode");
   touch("bg_mode");
 };
@@ -584,7 +585,9 @@ async function startJob(kind) {
   $("progressText").textContent = "Preparando…";
   try {
     settings.preview_start = live.at;
-    const r = await api(kind === "preview" ? "/api/preview" : "/api/render", { path: currentPath, settings });
+    const bg = currentBg();
+    const r = await api(kind === "preview" ? "/api/preview" : "/api/render",
+      { path: currentPath, settings, bg: /^#[0-9a-fA-F]{6}$/.test(bg) ? bg : "#000000" });
     activeJob = { id: r.id, kind };
     poll();
   } catch (e) {
@@ -608,9 +611,13 @@ async function poll() {
     $("progressBox").hidden = true;
     if (j.state === "done") {
       if (kind === "preview") {
-        showPreview(j.out_name, j.orig_name, !!j.alpha); setMode("video");
+        showPreview(j.out_name, j.orig_name, !!j.alpha, j); setMode("video");
         if (j.sample) showResult("Amostra de 5 segundos salva em:\n" + j.sample, false, true);
+        else if (j.sample_error) showResult("Não consegui salvar a amostra na pasta de destino.\nMotivo: " + j.sample_error +
+          "\nEscolha outra pasta no passo 3 (por exemplo, Documentos) e gere o teste de novo.", true);
       }
+      else if (/_ALPHA_PNG(_\d+)?$/.test(j.out_name || "")) showResult("Pronto! A sequência de imagens (e o áudio .wav) foi salva na pasta:\n" + j.out +
+        "\n\nNo Premiere: Arquivo > Importar, abra essa pasta, clique no PRIMEIRO arquivo .png, marque “Sequência de imagens” e clique em Abrir. Importe também o arquivo .wav.", false, true);
       else showResult("Pronto! O vídeo foi salvo em:\n" + j.out, false, true);
       showReport(j);
     } else if (j.state === "error") {
@@ -664,8 +671,41 @@ async function showReport(j) {
   } catch (e) { /* sem relatório */ }
 }
 
-function showPreview(name, orig, alpha) {
+let previewJob = null;
+function videoFailed(v) {
+  const j = previewJob;
+  const tries = Number(v.dataset.tries || 0);
+  if (!j || !v.src) return;
+  const code = v.error ? v.error.code : 0;
+  if (tries === 0) {                     // 1) o antivírus pode estar segurando o arquivo: tenta de novo em 2 s
+    v.dataset.tries = "1";
+    setTimeout(() => { v.src = mediaUrl(previewNames.proc); v.load(); v.play().catch(() => {}); }, 2000);
+    return;
+  }
+  if (tries === 1 && j.flat_name && previewNames.proc !== j.flat_name) {   // 2) transparente: o MP4 comum sobre a cor escolhida
+    v.dataset.tries = "2";
+    previewAlpha = false;
+    previewNames.proc = j.flat_name;
+    v.src = mediaUrl(j.flat_name); v.load(); v.play().catch(() => {});
+    $("previewNote").textContent = "Este navegador não tocou o teste com transparência; mostrando a versão em MP4 sobre a cor de fundo escolhida.";
+    applyBg();
+    return;
+  }
+  v.dataset.tries = "9";
+  const r = $("result");
+  showResult(`O player do Pascal não conseguiu tocar o teste (código ${code}).` +
+    (j.sample ? "\nA amostra foi salva em:\n" + j.sample : ""), true);
+  const b = document.createElement("button");
+  b.textContent = "Abrir no player do Windows"; b.className = "small";
+  b.onclick = () => api("/api/open-sample", { id: j.id }).catch((e) => alert(T(e.message)));
+  r.appendChild(document.createElement("br")); r.appendChild(b);
+}
+
+function showPreview(name, orig, alpha, job) {
   const v = $("video");
+  previewJob = job || null;
+  v.dataset.tries = "0";
+  v.onerror = () => videoFailed(v);
   previewAlpha = !!alpha;
   previewNames = { proc: name, orig: orig || "" };
   $("abBar").hidden = !orig;
@@ -707,7 +747,10 @@ $("btnRender").onclick = async () => {
     } catch (e) { $("progressBox").hidden = true; alert(T(e.message + "\n\nVai usar o modo Rápido FFmpeg.")); }
   }
   if (settings.mod_chroma && settings.bg_mode === "alpha_prores" && currentInfo && currentInfo.duration > 600) {
-    if (!confirm(T("O ProRes 4444 com transparência gera arquivos MUITO grandes (cerca de 2,5 GB por minuto de vídeo). Continuar?"))) return;
+    if (!confirm(T("O ProRes 4444 com transparência gera arquivos MUITO grandes (cerca de 2 GB por minuto de vídeo). Continuar?"))) return;
+  }
+  if (settings.mod_chroma && settings.bg_mode === "alpha_png" && currentInfo && currentInfo.duration > 300) {
+    if (!confirm(T("A sequência PNG gera um arquivo de imagem por quadro (cerca de 1.800 por minuto) e ocupa bastante espaço. Continuar?"))) return;
   }
   startJob("render");
 };

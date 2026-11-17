@@ -66,7 +66,7 @@ Cada chave liga ou desliga uma parte:
 
 1. Clique em **Testar 5 segundos**. O Pascal processa 5 segundos do vídeo, a partir do momento escolhido na barra Quadro.
 2. Quando terminar, o vídeo toca na tela. Use **Original (para comparar)** para ouvir e ver a diferença. Se o fundo for transparente, escolha a cor de fundo nos quadradinhos acima do vídeo: o teste sai com transparência de verdade e a cor muda na hora.
-3. Com o fundo preto de estúdio, o teste também é salvo na pasta de destino com o nome **nome-do-video_sample.mp4**. Assim você pode abrir em outro player ou mostrar a um colega. Com o fundo transparente o teste só aparece na tela do Pascal (não vira arquivo).
+3. O teste também é salvo na pasta de destino com o nome **nome-do-video_sample.mp4**. Assim você pode abrir em outro player ou mostrar a um colega. Com o fundo transparente, esse arquivo mostra a pessoa sobre a cor de fundo escolhida nos quadradinhos. Se o vídeo não tocar na tela do Pascal, clique em **Abrir no player do Windows**.
 4. Embaixo do vídeo aparece um relatório. Se houver avisos em vermelho, leia: eles dizem o que olhar.
 
 ## 8. Renderizar o vídeo completo

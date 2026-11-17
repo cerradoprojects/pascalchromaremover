@@ -26,7 +26,7 @@ DEFAULT_SETTINGS: dict = {
     "mod_upscale": True,
     "mod_audio": True,
     # Seção 1 — recorte
-    "bg_mode": "studio_mp4",        # studio_mp4 | alpha_prores | alpha_qtrle
+    "bg_mode": "studio_mp4",        # studio_mp4 | alpha_prores | alpha_png | alpha_qtrle
     "matte_engine": "rvm",          # rvm = recorte por IA offline (Robust Video Matting) + tira-verde; chroma = recorte clássico por chroma key
     "matte_mix": 0.3,               # 0..1  parte da cor ORIGINAL misturada à cor estimada pelo modelo na borda do cabelo
     "matte_style": "simples",       # simples = recorte do modelo + reforço do miolo + desmistura da borda; partes = cor de borda por partes do corpo (versão anterior)
@@ -91,11 +91,11 @@ DEFAULT_SETTINGS: dict = {
 
 # (mínimo, máximo) para números
 RANGES = {
-    "similarity": (0.01, 0.40), "blend": (0.0, 0.20), "despill": (0.0, 1.0),
-    "choke": (0, 5), "edge_width": (1, 12), "hair_despill": (0.0, 1.0), "clean": (0, 20),
-    "trim": (0.0, 10.0), "warmth": (0, 40), "contrast": (0.5, 2.0),
+    "similarity": (0.01, 0.50), "blend": (0.0, 0.30), "despill": (0.0, 2.0),
+    "choke": (0, 10), "edge_width": (1, 20), "hair_despill": (0.0, 2.0), "clean": (0, 30),
+    "trim": (0.0, 20.0), "warmth": (0, 60), "contrast": (0.5, 2.0),
     "gamma": (0.5, 2.0), "brightness": (-0.5, 0.5), "saturation": (0.0, 3.0),
-    "highlights": (0.0, 1.0), "sharpen": (0.0, 1.0), "clarity": (0.0, 1.0), "light": (0.0, 1.0), "rim": (0.0, 1.0), "grain": (0.0, 6.0), "edge_shade": (0.0, 1.0), "matte_mix": (0.0, 1.0), "matte_spill": (0.0, 1.0), "hair_speckle": (0.0, 1.0), "black_lift": (0.0, 0.08), "white_soft": (0.0, 0.08), "edge_soft": (0.0, 3.0), "ai_blend": (0.0, 1.0), "black_point": (0.0, 0.06), "a_nr": (0, 100), "a_room": (0, 100),
+    "highlights": (0.0, 2.0), "sharpen": (0.0, 2.0), "clarity": (0.0, 2.0), "light": (0.0, 1.5), "rim": (0.0, 1.0), "grain": (0.0, 10.0), "edge_shade": (0.0, 1.0), "matte_mix": (0.0, 1.0), "matte_spill": (0.0, 2.0), "hair_speckle": (0.0, 2.0), "black_lift": (0.0, 0.15), "white_soft": (0.0, 0.15), "edge_soft": (0.0, 6.0), "ai_blend": (0.0, 1.0), "black_point": (0.0, 0.12), "a_nr": (0, 100), "a_room": (0, 100),
     "a_nf": (-80, -20), "a_highpass": (20, 400), "a_lowpass": (4000, 20000),
     "a_body": (-12, 12), "a_boxy": (-12, 12), "a_presence": (-12, 12),
     "a_air": (-12, 12), "a_lufs": (-30, -9), "preview_start": (0, 86400),
@@ -103,7 +103,7 @@ RANGES = {
 }
 BOOLS = ["mod_chroma", "mod_grade", "mod_upscale", "mod_audio", "a_gate", "a_comp", "a_loudnorm", "isolate", "auto_exposure", "sharp_before"]
 CHOICES = {
-    "bg_mode": ["studio_mp4", "alpha_prores", "alpha_qtrle"],
+    "bg_mode": ["studio_mp4", "alpha_prores", "alpha_png", "alpha_qtrle"],
     "resolution": ["original", "1080p"],
     "sharp_method": ["cas", "unsharp"],
     "denoise": ["off", "leve", "medio", "forte"],
@@ -509,9 +509,13 @@ def build_video(s: dict, info: dict, preview: bool, transparent_out: bool, stage
         wsum0, dnw2 = g.label(), g.label()
         g.chains.append(f"[{dkw}][{band}]blend=all_mode=lighten[{wsum0}]")
         g.chains.append(f"[{dnw}]lut=y='val*{hs:.2f}'[{dnw2}]")
-        g.chains.append(f"[{wsum0}][{dnw2}]blend=all_mode=lighten[{wsum}]")
+        dsv = float(s.get("despill", 0.85))
+        wgain = min(1.0, dsv / 0.85)                    # abaixo do padrão: a correção pesa menos
+        wsum_f = f",lut=y='val*{wgain:.3f}'" if wgain < 0.999 else ""
+        g.chains.append(f"[{wsum0}][{dnw2}]blend=all_mode=lighten{wsum_f}[{wsum}]")
         dsp, dsa, edged = g.label(), g.label(), g.label()
-        g.chains.append(f"[{yd1}]format=gbrp,despill=type=green:mix=0.5:expand=0,format=yuv444p10le[{dsp}]")
+        dexp = max(0.0, min(0.3, (dsv - 0.85) * 0.26))  # acima do padrão: alcança verde mais fraco (2,0 -> expand 0,30; mais que isso deixa o cabelo roxo)
+        g.chains.append(f"[{yd1}]format=gbrp,despill=type=green:mix=0.5:expand={dexp:.3f},format=yuv444p10le[{dsp}]")
         g.chains.append(f"[{dsp}][{wsum}]alphamerge[{dsa}]")
         edged0 = g.label()
         g.chains.append(f"[{base2}][{dsa}]overlay=format=yuv444p10[{edged0}]")
@@ -544,8 +548,8 @@ def build_video(s: dict, info: dict, preview: bool, transparent_out: bool, stage
             g.chains.append(f"[{edged_s}]extractplanes=y+u+v[{sy}][{su}][{sv}]")
             g.chains.append(f"[{sy}]split=3[{sya}][{syb}][{smed}]")
             smed2, swd = g.label(), g.label()
-            g.chains.append(f"[{smed}]median=radius=1[{smed2}]")
-            g.chains.append(f"[{syb}]lut=y='clip((360-val)*1023/180,0,1023)*{hsp:.2f}',gblur=sigma=3,scale=in_range=pc:out_range=pc,format=gray10le[{swd}]")
+            g.chains.append(f"[{smed}]median=radius={2 if hsp > 1.0 else 1}[{smed2}]")
+            g.chains.append(f"[{syb}]lut=y='clip((360-val)*1023/180,0,1023)*{min(1.0, hsp):.2f}',gblur=sigma=3,scale=in_range=pc:out_range=pc,format=gray10le[{swd}]")
             g.chains.append(f"[{sya}][{smed2}][{swd}]maskedmerge[{sout}]")
             g.chains.append(f"[{sout}][{su}][{sv}]mergeplanes=0x001020:yuv444p10le[{edged}]")
         else:
@@ -611,14 +615,31 @@ def build_video(s: dict, info: dict, preview: bool, transparent_out: bool, stage
         sharp_f.append(f"unsharp=11:11:{s['clarity'] * 0.9:.3f}:11:11:0.0")   # contraste local (raio grande, só luminância)
     if s["mod_upscale"] and s["sharpen"] > 0:
         if s["sharp_method"] == "cas":
-            sharp_f.append(f"cas=strength={s['sharpen']:.3f}")
+            sharp_f.append(f"cas=strength={min(1.0, s['sharpen']):.3f}")
+            if s["sharpen"] > 1.0:
+                sharp_f.append(f"unsharp=5:5:{(s['sharpen'] - 1.0) * 1.4:.3f}:5:5:0.0")
         else:
             sharp_f.append(f"unsharp=5:5:{s['sharpen'] * 1.4:.3f}:5:5:0.0")
     # com fundo composto, a nitidez vem DEPOIS de juntar com o fundo; só no recorte transparente ela entra antes (mais leve)
     sharp_after = compose and not transparent_out and not s.get("sharp_before", False)
     if not sharp_after:
         g.add(*sharp_f)
-    if chroma:
+    if chroma and transparent_out and not compose:
+        # Arquivo transparente: fora da pessoa a cor guardada vira PRETO. A transparência não muda (o editor mostra igual),
+        # mas um player comum, que ignora a transparência, mostrava o verde original (e, no recorte avançado, um retângulo
+        # verde com laterais pretas). A cor da borda é mantida (máscara dilatada 1 px + degradê) para o alfa "direto" do editor.
+        # Bônus: o fundo preto liso deixa o arquivo ~2x menor.
+        g.flush()
+        a1, a2, mk, c1, c2, blk, cm, col, out = (g.label() for _ in range(9))
+        g.chains.append(f"[{g.acur}]{','.join(g.alin or ['null'])},format=gray,split=2[{a1}][{a2}]")
+        g.chains.append(f"[{a2}]lut=y='if(gt(val,2),255,0)',dilation,gblur=sigma=1[{mk}]")
+        g.chains.append(f"[{g.cur}]format=yuv444p10le,split=2[{c1}][{c2}]")
+        g.chains.append(f"[{c2}]lutyuv=y=64:u=512:v=512[{blk}]")
+        g.chains.append(f"[{c1}][{mk}]alphamerge[{cm}]")
+        g.chains.append(f"[{blk}][{cm}]overlay=format=yuv444p10[{col}]")
+        g.chains.append(f"[{col}][{a1}]alphamerge[{out}]")
+        g.cur = out
+    elif chroma:
         g.merge_alpha()
 
     # 5) saída
@@ -654,7 +675,10 @@ def build_video(s: dict, info: dict, preview: bool, transparent_out: bool, stage
         return g.build(), "vout"
 
     if chroma and transparent_out:
-        g.add("format=argb" if s["bg_mode"] == "alpha_qtrle" else "format=yuva444p10le")
+        if s["bg_mode"] == "alpha_qtrle":
+            g.add("scale=in_color_matrix=bt709:in_range=tv:out_range=pc:flags=bicubic+accurate_rnd+full_chroma_int", "format=argb")
+        else:
+            g.add("format=yuva444p10le")
     else:
         if pix_rgb:
             g.add("scale=in_color_matrix=bt709:in_range=tv:out_range=pc:flags=bicubic+error_diffusion", "format=rgb24")
@@ -777,15 +801,18 @@ def audio_graph(s: dict, room: dict, has_noise_input: bool, noise_idx: int = 1, 
 # Comando final
 # --------------------------------------------------------------------------
 def output_kind(s: dict) -> str:
-    """mp4 | prores | qtrle — o que o render completo vai gerar."""
+    """mp4 | prores | qtrle | png — o que o render completo vai gerar (png = pasta com sequência de imagens + áudio .wav)."""
     if s["mod_chroma"] and s["bg_mode"] == "alpha_prores":
         return "prores"
     if s["mod_chroma"] and s["bg_mode"] == "alpha_qtrle":
         return "qtrle"
+    if s["mod_chroma"] and s["bg_mode"] == "alpha_png":
+        return "png"
     return "mp4"
 
 
-SUFFIX = {"mp4": "_STUDIO.mp4", "prores": "_ALPHA_PREMIERE.mov", "qtrle": "_ALPHA_LEVE.mov"}
+SUFFIX = {"mp4": "_STUDIO.mp4", "prores": "_ALPHA_PREMIERE.mov", "qtrle": "_ALPHA_QTRLE.mov", "png": "_ALPHA_PNG"}
+TRANSPARENT_KINDS = ("prores", "qtrle", "png")
 
 
 def resolve_key_color(ffmpeg: str, src: str, s: dict, info: dict, at: float | None) -> dict:
@@ -809,7 +836,7 @@ def resolve_key_color(ffmpeg: str, src: str, s: dict, info: dict, at: float | No
 def build_command(ffmpeg: str, src: str, s: dict, info: dict, out_path: str,
                   preview: bool, start: float = 0.0, length: float = 0.0, diag: dict | None = None, matte: dict | None = None) -> list[str]:
     kind = output_kind(s)
-    transparent = kind in ("prores", "qtrle")
+    transparent = kind in TRANSPARENT_KINDS
     s = resolve_key_color(ffmpeg, src, s, info, start if preview else None)
     s = dict(s)
     s["_subject"] = analyze_subject(ffmpeg, src, start if preview else min(10.0, (info["duration"] or 20) * 0.3),
@@ -857,7 +884,12 @@ def build_command(ffmpeg: str, src: str, s: dict, info: dict, out_path: str,
         fc += ";" + audio_graph(s, room, room["ok"], noise_idx=ai + 1, main=f"{ai}:a", loud=loud)
         amap = ["-map", "[aout]"]
         use_af = False   # já aplicado dentro do filter_complex
-    cmd += ["-filter_complex", fc, "-map", f"[{vlabel}]"] + amap
+    png_seq = kind == "png" and not preview
+    if png_seq:   # RGB de faixa total (o PNG não guarda a etiqueta de cor); o áudio vai para um .wav ao lado
+        fc += f";[{vlabel}]scale=in_color_matrix=bt709:in_range=tv:out_range=pc:flags=bicubic+accurate_rnd+full_chroma_int,format=rgba[vpng]"
+        cmd += ["-filter_complex", fc, "-map", "[vpng]"]
+    else:
+        cmd += ["-filter_complex", fc, "-map", f"[{vlabel}]"] + amap
     if diag is not None:
         diag["settings"] = s
         diag["filter_complex"] = fc
@@ -866,18 +898,18 @@ def build_command(ffmpeg: str, src: str, s: dict, info: dict, out_path: str,
     if preview and s["_alpha_preview"]:
         # WebM VP9 com alfa: o Chrome/Edge toca com transparência e a cor de fundo é escolhida na tela
         cmd += ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "28", "-deadline", "realtime", "-cpu-used", "5",
-                "-row-mt", "1", "-auto-alt-ref", "0", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
+                "-row-mt", "1", "-auto-alt-ref", "0", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
         if info["has_audio"]:
             cmd += ["-c:a", "libopus", "-b:a", "160k", "-ar", "48000"]
     elif preview:
         cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "17", "-pix_fmt", "yuv420p",
-                "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
+                "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv",
                 "-movflags", "+faststart"]
         if info["has_audio"]:
             cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "48000"]
     elif kind == "mp4":
         cmd += ["-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p",
-                "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
+                "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv",
                 "-movflags", "+faststart"]
         if info["has_audio"]:
             if s["mod_audio"]:
@@ -886,13 +918,21 @@ def build_command(ffmpeg: str, src: str, s: dict, info: dict, out_path: str,
                 cmd += ["-c:a", "copy"]
             else:
                 cmd += ["-c:a", "aac", "-b:a", "256k"]
+    elif png_seq:
+        folder = Path(out_path)
+        stem = folder.name[: -len(SUFFIX["png"])] if folder.name.endswith(SUFFIX["png"]) else folder.name
+        cmd += ["-c:v", "png", "-pix_fmt", "rgba", "-pred", "mixed", "-compression_level", "3", "-f", "image2",
+                "-start_number", "0", str(folder / f"{stem}_%06d.png")]
+        if info["has_audio"]:
+            cmd += amap + ["-c:a", "pcm_s16le", "-ar", "48000", str(folder / f"{stem}_audio.wav")]
+        return cmd
     else:
         if kind == "prores":
             cmd += ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le",
-                    "-alpha_bits", "16", "-vendor", "apl0"]
+                    "-alpha_bits", "16", "-vendor", "apl0", "-metadata:s:v:0", "encoder=Apple ProRes 4444"]
         else:
             cmd += ["-c:v", "qtrle", "-pix_fmt", "argb"]
-        cmd += ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
+        cmd += ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"] + (["-color_range", "tv"] if kind == "prores" else [])
         if info["has_audio"]:
             cmd += ["-c:a", "pcm_s16le", "-ar", "48000"]
 
@@ -902,10 +942,12 @@ def build_command(ffmpeg: str, src: str, s: dict, info: dict, out_path: str,
 
 def unique_output(out_dir: Path, src: str, kind: str) -> Path:
     stem = Path(src).stem
-    p = out_dir / (stem + SUFFIX[kind])
+    suf = SUFFIX[kind]
+    base, ext = (suf, "") if kind == "png" else (suf[:-4], suf[-4:])
+    p = out_dir / (stem + suf)
     n = 2
     while p.exists():
-        p = out_dir / f"{stem}{SUFFIX[kind][:-4]}_{n}{SUFFIX[kind][-4:]}"
+        p = out_dir / f"{stem}{base}_{n}{ext}"
         n += 1
     return p
 
@@ -1000,7 +1042,7 @@ def build_still_command(ffmpeg: str, src: str, s: dict, info: dict, out_png: str
                         matte: dict | None = None, ready: bool = False) -> tuple[list[str], dict]:
     """Um quadro só, com todo o tratamento (cor, luz, nitidez, fundo), em PNG: serve ao quadro ao vivo da interface.
     Com fundo de estúdio sai opaco; com saída transparente sai PNG com alfa. ready=True: s já traz cor do verde e medição do sujeito."""
-    transparent = output_kind(s) in ("prores", "qtrle")
+    transparent = output_kind(s) in TRANSPARENT_KINDS
     s = dict(s)
     if not ready:
         s = resolve_key_color(ffmpeg, src, s, info, at)

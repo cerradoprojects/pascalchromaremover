@@ -1,0 +1,15 @@
+# pastas criadas na primeira execução
+input/
+output/
+presets_usuario/
+cache/
+logs/
+__pycache__/
+pascal_config.json
+
+# o que é pesado vai no zip da Release, não no git (ver README)
+bin/
+python/
+pacotes/py3*/
+pacotes/ort_alt_*/
+*.zip

@@ -66,7 +66,7 @@ Each switch turns a part on or off:
 
 1. Click **Test 5 seconds**. Pascal processes 5 seconds of the video, starting at the moment chosen on the Frame bar.
 2. When it finishes, the video plays on screen. Use **Original (to compare)** to hear and see the difference. If the background is transparent, choose the background color in the squares above the video: the test comes out with real transparency and the color changes instantly.
-3. With the studio black background, the test is also saved to the destination folder with the name **video-name_sample.mp4**. That way you can open it in another player or show it to a colleague. With the transparent background the test only appears on Pascal's screen (it doesn't become a file).
+3. The test is also saved to the destination folder with the name **video-name_sample.mp4**. That way you can open it in another player or show it to a colleague. With the transparent background, that file shows the person over the background color chosen in the squares. If the video doesn't play on Pascal's screen, click **Open in the Windows player**.
 4. A report appears under the video. If there are red warnings, read them: they say what to look at.
 
 ## 8. Render the full video
