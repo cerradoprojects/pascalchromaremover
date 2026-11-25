@@ -60,7 +60,20 @@ Atenção: esse formato gera arquivos grandes, cerca de 2 GB por minuto.
 
 ## O Premiere disse "arquivo não suportado" e abriu só o áudio. E agora?
 
-Isso acontece quando o Premiere do computador não lê o formato ProRes (versões antigas do Premiere, ou instalações sem o decodificador ProRes). Use a saída que abre em qualquer versão:
+**Atualize para o Pascal 1.0.6 e gere o vídeo de novo.** A causa encontrada: vídeos de celular (iPhone e Android) gravam com uma taxa de quadros levemente variável (por exemplo 29,997 quadros por segundo) e as versões anteriores do Pascal copiavam esse número quebrado para o `.mov` transparente; o Premiere recusa esse arquivo. Desde a 1.0.6 todo arquivo sai com taxa padrão (29,97, 30, 25, 60…), e no fim de cada vídeo o Pascal confere sozinho se o arquivo abre (o resultado fica no relatório).
+
+Se ainda assim o Premiere não abrir, há duas saídas que abrem em qualquer versão:
+
+**MP4 da pessoa + MP4 da máscara (a mais leve e compatível):**
+
+1. Na aba **Recorte e fundo**, em **Modo de saída do fundo**, escolha **Fundo Transparente — MP4 da pessoa + MP4 da máscara**.
+2. Renderize. Saem dois arquivos: `nome_PESSOA.mp4` (a pessoa sobre preto, com o áudio) e `nome_MASCARA.mp4` (branco onde está a pessoa, preto no resto).
+3. No Premiere, ponha o fundo que quiser na faixa **V1**, o `_PESSOA.mp4` na **V2** e o `_MASCARA.mp4` na **V3**, alinhados no mesmo ponto.
+4. No painel **Efeitos**, procure **Fosco da faixa** (Track Matte Key) e arraste para o clipe `_PESSOA.mp4`.
+5. Em **Controles de efeito**, escolha **Fosco: Vídeo 3** e **Composição usando: Luminância fosca**.
+6. Clique no olho da faixa **V3** para escondê-la. A pessoa aparece recortada sobre o fundo da V1.
+
+**Sequência de imagens PNG:**
 
 1. Na aba **Recorte e fundo**, em **Modo de saída do fundo**, escolha **Fundo Transparente — sequência de imagens PNG + áudio .WAV**.
 2. Renderize. O Pascal cria uma pasta `nome-do-video_ALPHA_PNG` com uma imagem por quadro (com transparência) e o áudio em `.wav`.
@@ -82,11 +95,15 @@ Na pasta que você escolheu no passo 3. Se você não escolheu nenhuma, na mesma
 
 Sim. Além de tocar na tela, o teste é salvo na pasta de destino como `nome-do-video_sample.mp4`, para você abrir em outro player ou mostrar a alguém. Com o **Fundo transparente** ligado, o arquivo salvo é um `.mp4` comum com a pessoa sobre a cor de fundo escolhida nos quadradinhos (um player comum não entende transparência); a transparência de verdade aparece só na tela do Pascal e no render completo.
 
-Se a pasta de destino não aceitar o arquivo (pasta protegida ou antivírus da empresa), o Pascal tenta de novo e, se não der, salva na pasta `output` do próprio Pascal e avisa. Se nem isso der certo, aparece em vermelho o motivo: escolha outra pasta no passo 3 (por exemplo, Documentos).
+Quando termina, aparece onde a amostra foi salva e o botão **Abrir a pasta**, que já mostra o arquivo selecionado. Se a pasta de destino não aceitar o arquivo (pasta protegida ou antivírus da empresa), o Pascal tenta de novo e, se não der, salva na pasta `output` do próprio Pascal e avisa. Se nem isso der certo, aparece em vermelho o motivo: escolha outra pasta no passo 3 (por exemplo, Documentos).
 
 ## Como aumento o vídeo na tela?
 
 Arraste a barrinha cinza que fica entre o vídeo e os **Ajustes**: o vídeo cresce e os ajustes diminuem. Dois cliques nela (ou o botão **Esconder ajustes**) escondem os ajustes de vez. O botão **◧ Painel**, no alto, esconde a coluna da esquerda. E o botão **⛶ Tela cheia** (ou a tecla **F**) mostra só o vídeo na tela inteira; **Esc** volta. O Pascal lembra o tamanho que você deixou.
+
+## Dá para dar zoom no vídeo de teste?
+
+Dá. No **Vídeo de teste**, gire a rodinha do mouse sobre o vídeo (ou use os botões **Tela, 100%, 200%, 400%, 800%**) e arraste para mexer; dois cliques voltam para a tela inteira. O vídeo continua tocando ampliado. Um clique toca ou pausa, as setas do teclado (ou **◂ quadro / quadro ▸**) andam um quadro de cada vez e o botão **Original** troca para o vídeo sem tratamento no mesmo ponto e no mesmo zoom.
 
 ## Posso ver o fundo transparente em outras cores?
 

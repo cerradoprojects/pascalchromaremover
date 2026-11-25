@@ -34,6 +34,7 @@ Pascal takes a video recorded in front of a green screen and delivers the finish
 4. The **Frame** bar chooses which moment of the video appears. Pick a moment when the person moves their head: that is where the cutout shows the most.
 5. To see the video bigger: drag the little gray bar between the video and the **Settings**; use **Hide settings** or **◧ Panel** to give it more room; or click **⛶ Full screen** (key **F**; **Esc** goes back).
 6. With **Transparent background** on, choose the background color in the squares above the video (or in the colorful square, for any color). It also works for the 5-second test.
+7. In the **Test video** the zoom works the same way: mouse wheel, dragging, the **Fit/100%/200%/400%/800%** buttons and a double-click to go back. One click on the video plays or pauses it (or the **space bar**); **◂ frame / frame ▸** (or the keyboard arrows) move one frame at a time; **⟲ Loop** keeps the test playing.
 
 ## 4. Choose what Pascal does (step 2 on screen)
 

@@ -60,7 +60,20 @@ Note: this format makes large files, about 2 GB per minute.
 
 ## Premiere said "file not supported" and opened only the audio. Now what?
 
-This happens when the Premiere on that computer can't read the ProRes format (old Premiere versions, or installations without the ProRes decoder). Use the output that opens in any version:
+**Update to Pascal 1.0.6 and render the video again.** The cause we found: phone videos (iPhone and Android) are recorded with a slightly variable frame rate (for example 29.997 frames per second) and earlier Pascal versions copied that odd number into the transparent `.mov`; Premiere rejects that file. Since 1.0.6 every file comes out with a standard rate (29.97, 30, 25, 60…), and at the end of each video Pascal checks by itself that the file opens (the result goes into the report).
+
+If Premiere still doesn't open it, two outputs open in any version:
+
+**Person MP4 + mask MP4 (lightest and most compatible):**
+
+1. In the **Cutout and background** tab, under **Background output mode**, choose **Transparent Background — person MP4 + mask MP4**.
+2. Render. Two files come out: `name_PESSOA.mp4` (the person over black, with the audio) and `name_MASCARA.mp4` (white where the person is, black elsewhere).
+3. In Premiere, put any background on track **V1**, `_PESSOA.mp4` on **V2** and `_MASCARA.mp4` on **V3**, lined up at the same point.
+4. In the **Effects** panel, search for **Track Matte Key** and drag it onto the `_PESSOA.mp4` clip.
+5. In **Effect Controls**, choose **Matte: Video 3** and **Composite using: Matte Luma**.
+6. Click the eye of track **V3** to hide it. The person shows cut out over the V1 background.
+
+**PNG image sequence:**
 
 1. In the **Cutout and background** tab, under **Background output mode**, choose **Transparent Background — PNG image sequence + .WAV audio**.
 2. Render. Pascal creates a `video-name_ALPHA_PNG` folder with one image per frame (with transparency) and the audio as `.wav`.
@@ -82,11 +95,15 @@ To the folder you chose in step 3. If you didn't choose one, to the same folder 
 
 Yes. Besides playing on screen, the test is saved to the destination folder as `video-name_sample.mp4`, so you can open it in another player or show it to someone. With **Transparent background** on, the saved file is an ordinary `.mp4` with the person over the background color chosen in the squares (an ordinary player doesn't understand transparency); real transparency shows only on Pascal's screen and in the full render.
 
-If the destination folder doesn't accept the file (a protected folder or a company antivirus), Pascal tries again and, if that fails, saves it in Pascal's own `output` folder and tells you. If even that fails, the reason shows in red: choose another folder in step 3 (for example, Documents).
+When it finishes, Pascal shows where the sample was saved and an **Open the folder** button that shows the file already selected. If the destination folder doesn't accept the file (a protected folder or a company antivirus), Pascal tries again and, if that fails, saves it in Pascal's own `output` folder and tells you. If even that fails, the reason shows in red: choose another folder in step 3 (for example, Documents).
 
 ## How do I make the video bigger on screen?
 
 Drag the little gray bar between the video and the **Settings**: the video grows and the settings shrink. Double-clicking it (or the **Hide settings** button) hides the settings completely. The **◧ Panel** button at the top hides the left column. And the **⛶ Full screen** button (or the **F** key) shows only the video on the whole screen; **Esc** goes back. Pascal remembers the size you left it at.
+
+## Can I zoom into the test video?
+
+Yes. In the **Test video**, turn the mouse wheel over the video (or use the **Fit, 100%, 200%, 400%, 800%** buttons) and drag to move; a double-click goes back to the full view. The video keeps playing while zoomed. One click plays or pauses, the keyboard arrows (or **◂ frame / frame ▸**) move one frame at a time and the **Original** button switches to the untreated video at the same point and the same zoom.
 
 ## Can I see the transparent background in other colors?
 

@@ -175,8 +175,19 @@
       </div>
 
       <div id="videoWrap" hidden>
-        <video id="video" controls playsinline></video>
+        <div id="vStage"><video id="video" playsinline loop preload="auto"></video></div>
         <div id="videoEmpty" data-en="The test video appears here.<br>Click <b>Test 5 seconds</b>.">O vídeo de teste aparece aqui.<br>Clique em <b>Testar 5 segundos</b>.</div>
+        <div id="vZoomHint" class="zoomhint" hidden>Role o mouse para dar zoom · arraste para mover · clique para tocar ou pausar</div>
+      </div>
+      <div id="vCtl" class="vctl" hidden>
+        <button id="vPlay" class="small" title="Tocar ou pausar (barra de espaço)">▶</button>
+        <button id="vPrev" class="small ghost" title="Quadro anterior (seta para a esquerda)">◂ quadro</button>
+        <button id="vNext" class="small ghost" title="Próximo quadro (seta para a direita)">quadro ▸</button>
+        <input id="vSeek" type="range" min="0" max="1000" step="1" value="0" title="Posição no vídeo">
+        <span id="vTime" class="muted">0:00,0 / 0:00,0</span>
+        <button id="vMute" class="small ghost" title="Ligar ou desligar o som">🔊</button>
+        <input id="vVol" type="range" min="0" max="1" step="0.05" value="1" title="Volume">
+        <button id="vLoop" class="small ghost on" title="Repetir o vídeo sem parar">⟲ Repetir</button>
       </div>
       <div id="abBar" class="row" hidden>
         <button id="btnProc" class="small on">Pascal</button>

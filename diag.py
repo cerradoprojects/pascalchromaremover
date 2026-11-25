@@ -131,10 +131,10 @@ def analyze_audio(log: JobLog, ffmpeg: str, src: str, out: str, start: float, le
         log.note("ÁUDIO: o vídeo de origem não tem áudio.")
         return
     lv_o, pk_o, cl_o, sec_o = pcm_levels(ffmpeg, src, start, length)
-    lv_p, pk_p, cl_p, sec_p = pcm_levels(ffmpeg, out)
+    lv_p, pk_p, cl_p, sec_p = pcm_levels(ffmpeg, out, 0.0, length)  # mesmo trecho do original (render longo: só os primeiros segundos)
     so, sp = level_stats(lv_o), level_stats(lv_p)
     lo = loudness(ffmpeg, src, start, length)
-    lp = loudness(ffmpeg, out)
+    lp = loudness(ffmpeg, out, 0.0, length)
     data = {"original": {**so, **lo, "pico_amostra_dB": round(pk_o, 1), "segundos": round(sec_o, 2)},
             "resultado": {**sp, **lp, "pico_amostra_dB": round(pk_p, 1), "amostras_no_limite": cl_p, "segundos": round(sec_p, 2)}}
     log.json("analise_audio.json", data)

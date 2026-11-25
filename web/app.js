@@ -27,9 +27,10 @@ const TABS = [
     { k: "bg_mode", t: "select", label: "Modo de saída do fundo", opts: [
       ["studio_mp4", "Fundo Preto de Estúdio (.MP4)"],
       ["alpha_prores", "Fundo Transparente para Premiere (.MOV ProRes 4444)"],
+      ["alpha_mp4matte", "Fundo Transparente — MP4 da pessoa + MP4 da máscara (o mais compatível e leve)"],
       ["alpha_png", "Fundo Transparente — sequência de imagens PNG + áudio .WAV (abre em qualquer Premiere)"],
       ["alpha_qtrle", "Fundo Transparente QTRLE (.MOV Animation, arquivo maior)"]],
-      help: "ProRes 4444 é o melhor para o Premiere atual. Se o Premiere disser \"arquivo não suportado\" e abrir só o áudio (Premiere antigo ou sem o decodificador ProRes), use a sequência PNG: ela abre em qualquer versão." },
+      help: "ProRes 4444 é o melhor para o Premiere atual. Se o Premiere disser \"arquivo não suportado\" e abrir só o áudio (Premiere antigo ou sem o decodificador ProRes), use a sequência PNG: ela abre em qualquer versão. MP4 + máscara: dois MP4 comuns (abrem em qualquer programa); no Premiere ponha a máscara na faixa de cima e use o efeito \"Fosco da faixa\" (Track Matte Key) na pessoa." },
     { k: "bg_style", t: "select", label: "Estilo do fundo de estúdio (modo MP4)", opts: [
       ["preto", "Preto de estúdio liso (natural, recomendado)"], ["feixe", "Preto com feixe de luz diagonal (estilo do alvo)"], ["halo", "Preto com brilho suave atrás da pessoa (pode parecer auréola)"]],
       help: "Só vale quando a saída é MP4 com fundo de estúdio." },
@@ -259,7 +260,7 @@ MODS.forEach((k) => {
 });
 $("transp").onchange = () => {
   settings.bg_mode = $("transp").checked
-    ? (["alpha_qtrle", "alpha_png"].includes(settings.bg_mode) ? settings.bg_mode : "alpha_prores") : "studio_mp4";
+    ? (["alpha_qtrle", "alpha_png", "alpha_mp4matte"].includes(settings.bg_mode) ? settings.bg_mode : "alpha_prores") : "studio_mp4";
   syncAll("bg_mode");
   touch("bg_mode");
 };
@@ -492,9 +493,116 @@ function zoomTo(s, cx, cy) {
 
 document.querySelectorAll("#zoomSeg button").forEach((b) => {
   b.onclick = () => {
+    if (!$("videoWrap").hidden) {          // modo "Vídeo de teste": o zoom vale para o vídeo
+      if (b.dataset.z === "fit") { vFit(); vApply(); markZoom("fit"); return; }
+      vZoomTo(parseFloat(b.dataset.z)); markZoom(b.dataset.z); return;
+    }
     if (b.dataset.z === "fit") { fitView(); applyView(); return; }
     zoomTo(parseFloat(b.dataset.z)); markZoom(b.dataset.z);
   };
+});
+
+// ------------------------------------------------------------------ zoom e controles do vídeo de teste
+// O vídeo fica num "palco" que se move e amplia como o quadro ao vivo (roda do mouse, arrastar, 100-800%).
+// Os controles do navegador ficariam ampliados junto; por isso o Pascal tem os próprios, fora da área ampliada.
+const vw = $("videoWrap"), vStage = $("vStage"), vid = $("video");
+const vz = { w: 0, h: 0, scale: 1, x: 0, y: 0, fit: true };
+function vFit() {
+  if (!vz.w) return;
+  const r = vw.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  vz.scale = Math.min(r.width / vz.w, r.height / vz.h);
+  vz.x = (r.width - vz.w * vz.scale) / 2;
+  vz.y = (r.height - vz.h * vz.scale) / 2;
+  vz.fit = true;
+}
+function vApply() {
+  vStage.style.transform = `translate(${vz.x}px,${vz.y}px) scale(${vz.scale})`;
+  vStage.classList.toggle("pix", vz.scale >= 2);
+}
+function vZoomTo(s, cx, cy) {
+  if (!vz.w) return;
+  const r = vw.getBoundingClientRect();
+  if (cx === undefined) { cx = r.width / 2; cy = r.height / 2; }
+  s = Math.max(0.05, Math.min(24, s));
+  vz.x = cx - (cx - vz.x) * s / vz.scale;
+  vz.y = cy - (cy - vz.y) * s / vz.scale;
+  vz.scale = s; vz.fit = false;
+  vApply();
+}
+vid.addEventListener("loadedmetadata", () => {
+  const w = vid.videoWidth, h = vid.videoHeight;
+  if (!w || !h) return;
+  if (vz.w && !vz.fit && w !== vz.w) {          // Pascal x Original com tamanhos diferentes (ex.: original 4K): mantém o mesmo pedaço na tela
+    const k = vz.w / w;
+    vz.scale *= k;
+  }
+  vz.w = w; vz.h = h;
+  vid.style.width = w + "px"; vid.style.height = h + "px";
+  if (vz.fit) vFit();
+  vApply();
+  vw.classList.add("has");
+  $("vZoomHint").hidden = false;
+  vSync();
+});
+vw.addEventListener("wheel", (e) => {
+  if (!vz.w) return;
+  e.preventDefault();
+  const r = vw.getBoundingClientRect();
+  vZoomTo(vz.scale * (e.deltaY < 0 ? 1.18 : 1 / 1.18), e.clientX - r.left, e.clientY - r.top);
+  markZoom("");
+}, { passive: false });
+let vDrag = null;
+vw.addEventListener("pointerdown", (e) => {
+  if (!vz.w || e.button !== 0) return;
+  vDrag = { sx: e.clientX, sy: e.clientY, x0: vz.x, y0: vz.y, moved: false };
+  vw.setPointerCapture(e.pointerId);
+});
+vw.addEventListener("pointermove", (e) => {
+  if (!vDrag) return;
+  const dx = e.clientX - vDrag.sx, dy = e.clientY - vDrag.sy;
+  if (!vDrag.moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+  vDrag.moved = true; vw.classList.add("drag");
+  vz.x = vDrag.x0 + dx; vz.y = vDrag.y0 + dy; vz.fit = false;
+  markZoom(""); vApply();
+});
+const vEnd = () => {
+  if (!vDrag) return;
+  const click = !vDrag.moved;
+  vDrag = null; vw.classList.remove("drag");
+  if (click) { clearTimeout(vEnd.t); vEnd.t = setTimeout(vToggle, 220); }   // clique simples = tocar/pausar (espera para ver se é duplo)
+};
+vw.addEventListener("pointerup", vEnd);
+vw.addEventListener("pointercancel", () => { vDrag = null; vw.classList.remove("drag"); });
+vw.addEventListener("dblclick", () => { clearTimeout(vEnd.t); vFit(); vApply(); markZoom("fit"); });
+new ResizeObserver(() => { if (vz.w) { if (vz.fit) vFit(); vApply(); } }).observe(vw);
+
+function vToggle() { if (!vid.src) return; if (vid.paused) vid.play().catch(() => {}); else vid.pause(); }
+function vStep(n) { if (!vid.src) return; vid.pause(); vid.currentTime = Math.max(0, Math.min(vid.duration || 0, vid.currentTime + n / 29.97)); }
+function vFmt(t) { t = Math.max(0, t || 0); const m = Math.floor(t / 60), s = t - m * 60; return m + ":" + (s < 10 ? "0" : "") + s.toFixed(1).replace(".", ","); }
+let vSeekOn = false;
+function vSync() {
+  $("vPlay").textContent = vid.paused ? "▶" : "❚❚";
+  const d = vid.duration || 0;
+  if (!vSeekOn && d) $("vSeek").value = String(Math.round(1000 * vid.currentTime / d));
+  $("vTime").textContent = vFmt(vid.currentTime) + " / " + vFmt(d);
+  $("vMute").textContent = vid.muted || vid.volume === 0 ? "🔇" : "🔊";
+  $("vLoop").classList.toggle("on", vid.loop);
+}
+["play", "pause", "timeupdate", "durationchange", "volumechange", "seeked"].forEach((ev) => vid.addEventListener(ev, vSync));
+$("vPlay").onclick = vToggle;
+$("vPrev").onclick = () => vStep(-1);
+$("vNext").onclick = () => vStep(1);
+$("vSeek").addEventListener("input", () => { vSeekOn = true; if (vid.duration) vid.currentTime = vid.duration * $("vSeek").value / 1000; });
+$("vSeek").addEventListener("change", () => { vSeekOn = false; });
+$("vMute").onclick = () => { vid.muted = !vid.muted; if (!vid.muted && vid.volume === 0) vid.volume = 1; };
+$("vVol").addEventListener("input", () => { vid.volume = parseFloat($("vVol").value); vid.muted = vid.volume === 0; });
+$("vLoop").onclick = () => { vid.loop = !vid.loop; vSync(); };
+window.addEventListener("keydown", (e) => {
+  if (vw.hidden || !vid.src || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName || "")) return;
+  if (e.key === " ") { e.preventDefault(); vToggle(); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); vStep(-1); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); vStep(1); }
 });
 vp.addEventListener("wheel", (e) => {
   e.preventDefault();
@@ -561,7 +669,10 @@ function setMode(m) {
   $("modeVideo").classList.toggle("on", !isLive);
   $("liveWrap").hidden = !isLive;
   $("videoWrap").hidden = isLive;
-  $("cmpSeg").style.display = $("zoomSeg").style.display = isLive ? "" : "none";
+  $("cmpSeg").style.display = isLive ? "" : "none";
+  markZoom(isLive ? (live.fit ? "fit" : "") : (vz.fit ? "fit" : ""));
+  $("vCtl").hidden = isLive || !vid.getAttribute("src");
+  if (isLive && !vid.paused) vid.pause();
   $("bgBox").style.display = (isLive || previewAlpha) ? "" : "none";
   $("abBar").hidden = isLive || !previewNames.orig;
   if (isLive) { fitView(); applyView(); touch("*", true); }
@@ -612,12 +723,15 @@ async function poll() {
     if (j.state === "done") {
       if (kind === "preview") {
         showPreview(j.out_name, j.orig_name, !!j.alpha, j); setMode("video");
-        if (j.sample) showResult("Amostra de 5 segundos salva em:\n" + j.sample, false, true);
-        else if (j.sample_error) showResult("Não consegui salvar a amostra na pasta de destino.\nMotivo: " + j.sample_error +
+        if (j.sample) showResult("Amostra de 5 segundos salva em:\n" + j.sample + (j.sample_note ? "\n" + j.sample_note : ""), false,
+          () => api("/api/open-sample", { id: j.id, reveal: true }).catch((e) => alert(T(e.message))));
+        else showResult("Não consegui salvar a amostra na pasta de destino.\nMotivo: " + (j.sample_error || "desconhecido (veja o relatório do teste)") +
           "\nEscolha outra pasta no passo 3 (por exemplo, Documentos) e gere o teste de novo.", true);
       }
       else if (/_ALPHA_PNG(_\d+)?$/.test(j.out_name || "")) showResult("Pronto! A sequência de imagens (e o áudio .wav) foi salva na pasta:\n" + j.out +
         "\n\nNo Premiere: Arquivo > Importar, abra essa pasta, clique no PRIMEIRO arquivo .png, marque “Sequência de imagens” e clique em Abrir. Importe também o arquivo .wav.", false, true);
+      else if (j.mask) showResult("Pronto! Foram salvos dois arquivos:\n" + j.out + "\n" + j.mask +
+        "\n\nNo Premiere: ponha o _PESSOA.mp4 na faixa V2 e o _MASCARA.mp4 na faixa V3, logo acima. No _PESSOA.mp4 aplique o efeito “Fosco da faixa” (Track Matte Key), escolha Fosco: Vídeo 3 e Composição: Luminância fosca. Desligue o olho da faixa V3.", false, true);
       else showResult("Pronto! O vídeo foi salvo em:\n" + j.out, false, true);
       showReport(j);
     } else if (j.state === "error") {
@@ -710,8 +824,10 @@ function showPreview(name, orig, alpha, job) {
   previewNames = { proc: name, orig: orig || "" };
   $("abBar").hidden = !orig;
   $("btnProc").classList.add("on"); $("btnOrig").classList.remove("on");
+  vz.w = 0; vz.fit = true;              // teste novo: começa encaixado na tela
   v.src = mediaUrl(name);
   v.style.display = "block";
+  $("vCtl").hidden = false;
   $("videoEmpty").style.display = "none";
   v.load();
   v.play().catch(() => {});
@@ -731,7 +847,7 @@ function showResult(text, isErr, openBtn) {
     r.appendChild(document.createElement("br"));
     const b = document.createElement("button");
     b.textContent = "Abrir a pasta"; b.className = "small";
-    b.onclick = () => api("/api/open-output", {});
+    b.onclick = typeof openBtn === "function" ? openBtn : () => api("/api/open-output", {});
     r.appendChild(b);
   }
 }

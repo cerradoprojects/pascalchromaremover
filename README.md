@@ -28,7 +28,7 @@ You filmed someone in an office, in front of a green sheet, under questionable l
 - **Studio light and color** — automatic exposure measured on the face, warm tone, contrast, a lighting gradient that gives volume, fine grain.
 - **Sharpness and size** — always 1080p (vertical or horizontal), sharpened *after* compositing so the cutout edge doesn't get a halo.
 - **Audio** — evens out the volume. That's it. (We tried doing more. It sounded like a bathroom.)
-- **Output** — MP4 with a studio black background, or real transparency for Premiere: ProRes 4444 `.mov`, a PNG image sequence + `.wav` (opens in any Premiere version, including old ones without a ProRes decoder) or QTRLE `.mov`.
+- **Output** — MP4 with a studio black background, or real transparency for Premiere: ProRes 4444 `.mov`, a person MP4 + black-and-white mask MP4 (Track Matte Key; the most compatible), a PNG image sequence + `.wav` (opens in any Premiere version, including old ones without a ProRes decoder) or QTRLE `.mov`.
 - **Live frame** — move any slider and see the result in seconds, with zoom, split view and background colors.
 - **Bilingual interface** — Portuguese and English (the **PT | EN** button, top right).
 - **Local and portable** — runs from a folder or a USB stick. No installer, no admin rights, no account, no internet. Your video never leaves your computer.

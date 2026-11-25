@@ -103,7 +103,7 @@ RANGES = {
 }
 BOOLS = ["mod_chroma", "mod_grade", "mod_upscale", "mod_audio", "a_gate", "a_comp", "a_loudnorm", "isolate", "auto_exposure", "sharp_before"]
 CHOICES = {
-    "bg_mode": ["studio_mp4", "alpha_prores", "alpha_png", "alpha_qtrle"],
+    "bg_mode": ["studio_mp4", "alpha_prores", "alpha_mp4matte", "alpha_png", "alpha_qtrle"],
     "resolution": ["original", "1080p"],
     "sharp_method": ["cas", "unsharp"],
     "denoise": ["off", "leve", "medio", "forte"],
@@ -174,14 +174,7 @@ def probe(ffprobe: str, path: str) -> dict:
     if abs(rot) % 180 == 90:
         w, h = h, w
 
-    fps_s = vs.get("avg_frame_rate") or vs.get("r_frame_rate") or "30/1"
-    try:
-        n, d = fps_s.split("/")
-        fps = float(n) / float(d) if float(d) else 30.0
-    except (ValueError, ZeroDivisionError):
-        fps, fps_s = 30.0, "30/1"
-    if fps <= 0 or fps > 240:
-        fps, fps_s = 30.0, "30/1"
+    fps, fps_s = standard_fps(vs.get("avg_frame_rate"), vs.get("r_frame_rate"))
 
     dur = 0.0
     for src in (data.get("format", {}).get("duration"), vs.get("duration")):
@@ -196,6 +189,40 @@ def probe(ffprobe: str, path: str) -> dict:
         "has_audio": aus is not None, "audio_codec": (aus or {}).get("codec_name", ""),
         "color_space": vs.get("color_space", ""), "codec": vs.get("codec_name", ""),
     }
+
+
+STD_FPS = ["12/1", "15/1", "20/1", "24000/1001", "24/1", "25/1", "30000/1001", "30/1", "48/1", "50/1", "60000/1001", "60/1", "90/1", "100/1", "120/1", "240/1"]
+
+
+def _ratio(x) -> float:
+    try:
+        n, _, d = str(x).partition("/")
+        v = float(n) / float(d or 1)
+        return v if 0 < v <= 240 else 0.0
+    except (ValueError, ZeroDivisionError):
+        return 0.0
+
+
+def standard_fps(avg, rf) -> tuple[float, str]:
+    """Taxa de quadros PADRÃO de vídeo. iPhone e Android gravam com taxa variável e o arquivo diz, por exemplo,
+    942600/31423 (29,997 q/s); repassar isso deixava o .mov com taxa e "relógio" quebrados, que o Premiere recusa
+    ("arquivo não suportado", abre só o áudio). Encaixa no padrão mais próximo (29,97, 30, 25, 60…)."""
+    for v in (_ratio(avg), _ratio(rf)):
+        if not v:
+            continue
+        best = min(STD_FPS, key=lambda f: abs(_ratio(f) - v) / v)
+        if abs(_ratio(best) - v) / v < 0.02:
+            return _ratio(best), best
+    # longe de todos (celular que perdeu muitos quadros): mesmo assim usa o padrão mais próximo, nunca um número quebrado
+    v = _ratio(avg) or _ratio(rf) or 30.0
+    best = min(STD_FPS, key=lambda f: abs(_ratio(f) - v) / v)
+    return _ratio(best), best
+
+
+def mov_timescale(fps_s: str) -> str:
+    """Relógio interno do .mov no padrão da Apple: 30000 para 29,97; 30 q/s -> 30000; 25 -> 25000 etc."""
+    n, _, d = fps_s.partition("/")
+    return n if d == "1001" else str(int(round(_ratio(fps_s) * 1000)))
 
 
 def detect_green(ffmpeg: str, path: str, at: float = 0.0) -> str | None:
@@ -761,13 +788,29 @@ def audio_chain(s: dict, speech_db: float, denoise: bool, loud: dict | None = No
         if measure:
             f.append(f"loudnorm=I={s['a_lufs'] - 3.0:.1f}:TP=-1.5:LRA=11:print_format=json")
         elif loud:
-            f.append(f"loudnorm=I={s['a_lufs'] - 3.0:.1f}:TP=-1.5:LRA=11:measured_I={loud['input_i']}:measured_TP={loud['input_tp']}:"
-                     f"measured_LRA={loud['input_lra']}:measured_thresh={loud['input_thresh']}:offset={loud['target_offset']}:linear=true")
-        else:
-            f.append(f"loudnorm=I={s['a_lufs'] - 3.0:.1f}:TP=-1.5:LRA=11")
-        f.append("aresample=48000")   # o loudnorm devolve 192 kHz; voltamos para 48 kHz
-    f.append("alimiter=limit=0.89")
+            # Ganho ÚNICO calculado por nós (volume puro). O loudnorm "linear=true" volta sozinho para o modo DINÂMICO
+            # (comprime e sobe o ruído entre as falas: SNR 11 -> 6 dB nos testes de 17/11) quando o ganho levaria os
+            # picos acima do teto. Aqui o ganho é limitado: no máximo 3 dB de pico vão para o limitador no fim.
+            f.append(f"volume={linear_gain(s, loud):.2f}dB")
+        f.append("aresample=48000")   # o loudnorm (medição) devolve 192 kHz; voltamos para 48 kHz
+    # level=false: por padrão o alimiter "nivela" a saída até o teto (soma 1-4 dB e achata a fala; achado em 25/11)
+    f.append("alimiter=limit=0.89:level=false")
     return ",".join(f)
+
+
+def linear_gain(s: dict, loud: dict) -> float:
+    """Ganho (dB) que leva o volume ao alvo sem mexer na dinâmica: alvo - medido, limitado para os picos não passarem
+    mais de 3 dB do teto (-1,5 dBTP); o alimiter do fim segura esse pouco. Mono duplicado soma +3 LU: alvo = lufs - 3."""
+    try:
+        i, tp = float(loud["input_i"]), float(loud["input_tp"])
+    except (KeyError, TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(i) or i < -70:          # silêncio ou medição inválida: não mexe
+        return 0.0
+    g = (s["a_lufs"] - 3.0) - i
+    if math.isfinite(tp):
+        g = min(g, -1.5 + 3.0 - tp)
+    return max(-30.0, min(30.0, g))
 
 
 def measure_loudness(ffmpeg: str, in_args: list[str], s: dict, room: dict, has_noise: bool) -> dict | None:
@@ -790,7 +833,9 @@ def audio_graph(s: dict, room: dict, has_noise_input: bool, noise_idx: int = 1, 
                 loud: dict | None = None, measure: bool = False) -> str:
     """Pedaço de -filter_complex que gera [aout] (estéreo 48 kHz). O ruído da sala entra como 1 s antes da fala."""
     chain = audio_chain(s, room["speech_db"], has_noise_input, loud, measure)
-    fmt = "aformat=sample_rates=48000:channel_layouts=mono"
+    # Estéreo -> mono SEMPRE pela média (rematrix_maxval=1). Sem isso o FFmpeg escolhia a mistura conforme o resto do
+    # comando: na medição saía a média e no arquivo final saía a soma (+3 dB), e o volume passava do alvo.
+    fmt = "aresample=48000:ochl=mono:rematrix_maxval=1,aformat=sample_rates=48000:channel_layouts=mono"
     if has_noise_input:
         return (f"[{noise_idx}:a]{fmt}[an];[{main}]{fmt}[am];[an][am]concat=n=2:v=0:a=1,{chain},"
                 f"atrim=start={1.0 + AFFTDN_LATENCY:.3f},asetpts=PTS-STARTPTS,pan=stereo|c0=c0|c1=c0[aout]")
@@ -808,11 +853,14 @@ def output_kind(s: dict) -> str:
         return "qtrle"
     if s["mod_chroma"] and s["bg_mode"] == "alpha_png":
         return "png"
+    if s["mod_chroma"] and s["bg_mode"] == "alpha_mp4matte":
+        return "mp4matte"
     return "mp4"
 
 
-SUFFIX = {"mp4": "_STUDIO.mp4", "prores": "_ALPHA_PREMIERE.mov", "qtrle": "_ALPHA_QTRLE.mov", "png": "_ALPHA_PNG"}
-TRANSPARENT_KINDS = ("prores", "qtrle", "png")
+SUFFIX = {"mp4": "_STUDIO.mp4", "prores": "_ALPHA_PREMIERE.mov", "qtrle": "_ALPHA_QTRLE.mov", "png": "_ALPHA_PNG", "mp4matte": "_PESSOA.mp4"}
+TRANSPARENT_KINDS = ("prores", "qtrle", "png", "mp4matte")
+MATTE_SUFFIX = "_MASCARA.mp4"     # par do _PESSOA.mp4: a máscara preto e branco (branco = pessoa)
 
 
 def resolve_key_color(ffmpeg: str, src: str, s: dict, info: dict, at: float | None) -> dict:
@@ -885,11 +933,17 @@ def build_command(ffmpeg: str, src: str, s: dict, info: dict, out_path: str,
         amap = ["-map", "[aout]"]
         use_af = False   # já aplicado dentro do filter_complex
     png_seq = kind == "png" and not preview
+    mp4m = kind == "mp4matte" and not preview
+    cfr = ["-fps_mode", "cfr", "-r", info["fps_str"]]    # taxa constante e padrão em toda saída (celular grava com taxa variável)
     if png_seq:   # RGB de faixa total (o PNG não guarda a etiqueta de cor); o áudio vai para um .wav ao lado
         fc += f";[{vlabel}]scale=in_color_matrix=bt709:in_range=tv:out_range=pc:flags=bicubic+accurate_rnd+full_chroma_int,format=rgba[vpng]"
-        cmd += ["-filter_complex", fc, "-map", "[vpng]"]
+        cmd += ["-filter_complex", fc, "-map", "[vpng]"] + cfr
+    elif mp4m:    # dois MP4 comuns: a pessoa (sobre preto) e a máscara P&B; abrem em qualquer programa e player
+        fc += (f";[{vlabel}]split=2[mpc][mpa];[mpc]format=yuv420p[vcor];"
+               f"[mpa]alphaextract,scale=in_range=pc:out_range=tv,format=yuv420p[vmask]")
+        cmd += ["-filter_complex", fc, "-map", "[vcor]"] + amap + cfr + ["-map_metadata", "-1", "-map_chapters", "-1"]
     else:
-        cmd += ["-filter_complex", fc, "-map", f"[{vlabel}]"] + amap
+        cmd += ["-filter_complex", fc, "-map", f"[{vlabel}]"] + amap + cfr + ["-map_metadata", "-1", "-map_chapters", "-1"]
     if diag is not None:
         diag["settings"] = s
         diag["filter_complex"] = fc
@@ -918,6 +972,13 @@ def build_command(ffmpeg: str, src: str, s: dict, info: dict, out_path: str,
                 cmd += ["-c:a", "copy"]
             else:
                 cmd += ["-c:a", "aac", "-b:a", "256k"]
+    elif mp4m:
+        h264 = ["-c:v", "libx264", "-crf", "16", "-preset", "medium", "-pix_fmt", "yuv420p", "-profile:v", "high",
+                "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv", "-movflags", "+faststart"]
+        cmd += h264 + (["-c:a", "aac", "-b:a", "256k", "-ar", "48000", "-ac", "2"] if info["has_audio"] else []) + [out_path]
+        mask = out_path[: -len(SUFFIX["mp4matte"])] + MATTE_SUFFIX if out_path.endswith(SUFFIX["mp4matte"]) else out_path[:-4] + "_mascara.mp4"
+        cmd += ["-map", "[vmask]"] + cfr + h264 + [mask]
+        return cmd
     elif png_seq:
         folder = Path(out_path)
         stem = folder.name[: -len(SUFFIX["png"])] if folder.name.endswith(SUFFIX["png"]) else folder.name
@@ -933,11 +994,35 @@ def build_command(ffmpeg: str, src: str, s: dict, info: dict, out_path: str,
         else:
             cmd += ["-c:v", "qtrle", "-pix_fmt", "argb"]
         cmd += ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"] + (["-color_range", "tv"] if kind == "prores" else [])
+        cmd += ["-video_track_timescale", mov_timescale(info["fps_str"]), "-write_tmcd", "0"]
         if info["has_audio"]:
             cmd += ["-c:a", "pcm_s16le", "-ar", "48000"]
 
     cmd.append(out_path)
     return cmd
+
+
+def compat_check(ffprobe: str, ffmpeg: str, path: str, fps_s: str) -> list[str]:
+    """Confere se o arquivo pronto abre em editores: taxa de quadros padrão e constante, índice (moov) presente,
+    e decodifica o começo e o fim. Devolve a lista de problemas (vazia = ok)."""
+    probs: list[str] = []
+    cp = _run([ffprobe, "-v", "error", "-select_streams", "v:0", "-show_entries",
+               "stream=codec_name,r_frame_rate,avg_frame_rate,time_base:format=duration", "-of", "json", path], 120)
+    try:
+        d = json.loads(cp.stdout.decode("utf-8", "replace"))
+        st = d["streams"][0]
+        dur = float(d["format"].get("duration") or 0)
+    except (ValueError, KeyError, IndexError):
+        return ["o arquivo não pôde ser lido (incompleto ou corrompido)"]
+    if st.get("r_frame_rate") not in STD_FPS:
+        probs.append(f"taxa de quadros fora do padrão ({st.get('r_frame_rate')})")
+    if st.get("avg_frame_rate") != st.get("r_frame_rate"):
+        probs.append(f"taxa de quadros variável ({st.get('avg_frame_rate')})")
+    for ss in (0.0, max(0.0, dur - 1.5)):
+        r = _run([ffmpeg, "-v", "error", "-ss", f"{ss:.2f}", "-t", "1", "-i", path, "-f", "null", "-"], 300)
+        if r.returncode != 0 or r.stderr.strip():
+            probs.append(f"erro ao ler o trecho em {ss:.0f}s: " + r.stderr.decode("utf-8", "replace").strip()[-160:])
+    return probs
 
 
 def unique_output(out_dir: Path, src: str, kind: str) -> Path:

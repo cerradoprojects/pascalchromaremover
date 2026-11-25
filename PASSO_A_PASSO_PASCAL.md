@@ -34,6 +34,7 @@ O Pascal pega o vídeo gravado na frente do fundo verde e entrega o vídeo pront
 4. A barra **Quadro** escolhe qual momento do vídeo aparece. Escolha um momento em que a pessoa mexe a cabeça: é onde o recorte mais aparece.
 5. Para ver o vídeo maior: arraste a barrinha cinza entre o vídeo e os **Ajustes**; use **Esconder ajustes** ou **◧ Painel** para dar mais espaço; ou clique em **⛶ Tela cheia** (tecla **F**; **Esc** volta).
 6. Com **Fundo transparente** ligado, escolha a cor de fundo nos quadradinhos acima do vídeo (ou no quadradinho colorido, para qualquer cor). Vale também para o teste de 5 segundos.
+7. No **Vídeo de teste** o zoom funciona igual: rodinha do mouse, arrastar, botões **Tela/100%/200%/400%/800%** e dois cliques para voltar. Um clique no vídeo toca ou pausa (ou a **barra de espaço**); as setas **◂ quadro / quadro ▸** (ou as setas do teclado) andam um quadro de cada vez; **⟲ Repetir** deixa o teste tocando sem parar.
 
 ## 4. Escolher o que o Pascal faz (passo 2 na tela)
 

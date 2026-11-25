@@ -194,31 +194,50 @@ def save_sample(out: Path, video: str, dest: Path) -> tuple[Path | None, str]:
     stem = Path(video).stem
     ext = out.suffix or ".mp4"
     why = ""
+    # 1) a origem (cache) pode estar presa pelo antivírus logo depois de gravada: espera até ~20 s ela abrir para leitura
+    for tent in range(14):
+        try:
+            with open(out, "rb") as fh:
+                fh.read(1)
+            break
+        except OSError as e:
+            why = f"o arquivo do teste está preso por outro programa (antivírus?): {e.strerror or e}"
+            time.sleep(1.5)
+    else:
+        log("AMOSTRA não salva: " + why)
+        return None, why
+    size = out.stat().st_size
     for folder in dict.fromkeys([dest, OUTPUT]):
         try:
             folder.mkdir(parents=True, exist_ok=True)
         except OSError as e:
             why = f"{folder}: {e.strerror or e}"
             continue
-        for n in range(1, 50):
+        denied = 0
+        for n in range(1, 12):
             target = folder / (f"{stem}_sample{ext}" if n == 1 else f"{stem}_sample_{n}{ext}")
+            if target.exists():
+                try:
+                    open(target, "r+b").close()      # dá para regravar? (aberto num player = não dá: usa o próximo nome)
+                except OSError:
+                    why = f"{target.name} está aberto em outro programa"
+                    continue
             for tent in range(4):
+                err = ""
                 try:
                     shutil.copyfile(out, target)
-                    if target.stat().st_size == out.stat().st_size:
-                        return target, ""
-                    why = f"{target.name}: cópia incompleta"
-                except PermissionError as e:
-                    why = f"{target}: {e.strerror or e}"
-                    if target.exists():
-                        break           # nome ocupado (arquivo aberto em outro programa): tenta o próximo nome
-                    time.sleep(1.5)     # antivírus segurando o arquivo: espera e tenta de novo
                 except OSError as e:
-                    why = f"{target}: {e.strerror or e}"
-                    break
-            else:
-                continue
-            if not target.exists():
+                    err = f"{target}: {e.strerror or e}"
+                if not err and target.is_file() and target.stat().st_size == size:
+                    return target, ""
+                # plano B: o próprio FFmpeg copia (há antivírus que barram um programa e não o outro)
+                cp = D._run([FFMPEG, "-v", "error", "-y", "-i", str(out), "-map", "0", "-c", "copy", "-movflags", "+faststart", str(target)], 120)
+                if cp.returncode == 0 and target.is_file() and target.stat().st_size > size * 0.9:
+                    return target, ""
+                why = err or (cp.stderr.decode("utf-8", "replace").strip()[-200:] or "cópia incompleta")
+                time.sleep(1.5)
+            denied += 1
+            if denied >= 2:
                 break                   # a pasta não aceita gravação: passa para a próxima pasta
     log("AMOSTRA não salva: " + why)
     return None, why
@@ -464,28 +483,38 @@ def start_preview(path: str, raw: dict, bg: str | None = None) -> dict:
                 # Fundo transparente: o WebM com alfa é para a tela do Pascal (cor de fundo escolhida nos quadradinhos).
                 # Para a pasta vai um MP4 comum, já sobre essa cor (um player comum ignora a transparência). Esse MP4 também
                 # é o plano B do player do Pascal, se o navegador do computador não tocar o WebM.
-                flat = out
-                if alpha_prev:
-                    job["message"] = "Gerando a amostra em MP4…"
-                    fl = CACHE / f"preview_{job['id']}_flat.mp4"
-                    if flatten_alpha(out, fl, _bg_hex(bg), info):
-                        flat = fl
-                        job["flat_name"] = fl.name
-                        jl.note(f"AMOSTRA transparente: MP4 sobre a cor {_bg_hex(bg)} para tocar em qualquer player.")
-                    else:
-                        flat = None
-                        jl.alert("Não consegui gerar o MP4 da amostra transparente (veja cache/app.log).")
-                if flat:
-                    job["message"] = "Salvando a amostra na pasta de destino…"
-                    samp, why = save_sample(flat, path, current_out_dir(path))
-                    if samp:
-                        job["sample"] = str(samp)
-                        jl.note(f"AMOSTRA de 5 s salva em: {samp}")
-                        if samp.parent != current_out_dir(path):
-                            jl.alert(f"A pasta de destino não aceitou o arquivo; a amostra foi salva na pasta output do Pascal ({samp.parent}).")
-                    else:
-                        job["sample_error"] = why
-                        jl.alert("Não consegui salvar a amostra na pasta de destino: " + why)
+                # A amostra vem PRIMEIRO e com proteção própria: antes, um erro em qualquer passo do diagnóstico
+                # (que roda junto) fazia a amostra sumir sem nenhum aviso.
+                try:
+                    flat = out
+                    if alpha_prev:
+                        job["message"] = "Gerando a amostra em MP4…"
+                        fl = CACHE / f"preview_{job['id']}_flat.mp4"
+                        if flatten_alpha(out, fl, _bg_hex(bg), info):
+                            flat = fl
+                            job["flat_name"] = fl.name
+                            jl.note(f"AMOSTRA transparente: MP4 sobre a cor {_bg_hex(bg)} para tocar em qualquer player.")
+                        else:
+                            flat = None
+                            job["sample_error"] = "não consegui gerar o MP4 da amostra (veja cache/app.log)"
+                            jl.alert("Não consegui gerar o MP4 da amostra transparente (veja cache/app.log).")
+                    if flat:
+                        job["message"] = "Salvando a amostra na pasta de destino…"
+                        dest = current_out_dir(path)
+                        samp, why = save_sample(flat, path, dest)
+                        if samp:
+                            job["sample"] = str(samp)
+                            jl.note(f"AMOSTRA de 5 s salva em: {samp}")
+                            if samp.parent != dest:
+                                job["sample_note"] = f"A pasta escolhida ({dest}) não aceitou o arquivo; a amostra foi salva na pasta output do Pascal."
+                                jl.alert(job["sample_note"])
+                        else:
+                            job["sample_error"] = why
+                            jl.alert("Não consegui salvar a amostra na pasta de destino: " + why)
+                except Exception as e:  # noqa: BLE001
+                    log("ERRO amostra: " + traceback.format_exc())
+                    job["sample_error"] = str(e) or e.__class__.__name__
+                    jl.alert("Não consegui salvar a amostra: " + job["sample_error"])
                 job["message"] = "Gerando o original para comparar…"
                 orig = CACHE / f"orig_{job['id']}.mp4"
                 D._run([FFMPEG, "-v", "error", "-y", "-ss", f"{start:.3f}", "-t", f"{length:.3f}", "-i", path, "-map", "0:v:0", "-map", "0:a:0?",
@@ -689,6 +718,20 @@ def start_render(path: str, raw: dict) -> dict:
                     log("RESUMO\n" + txt)
                     return
                 D.video_sanity(jl, FFPROBE, str(out), info["duration"], (info["width"], info["height"]), s["mod_upscale"])
+                files = [out]
+                if kind == "mp4matte":
+                    files.append(out.with_name(out.name[: -len(P.SUFFIX["mp4matte"])] + P.MATTE_SUFFIX))
+                    job["mask"] = str(files[1])
+                job["message"] = "Conferindo se o arquivo abre em editores (Premiere)…"
+                for f in files:
+                    if not f.exists():
+                        jl.alert(f"Arquivo não gerado: {f.name}")
+                        continue
+                    probs = P.compat_check(FFPROBE, FFMPEG, str(f), info["fps_str"])
+                    if probs:
+                        jl.alert(f"COMPATIBILIDADE {f.name}: " + "; ".join(probs))
+                    else:
+                        jl.note(f"COMPATIBILIDADE {f.name}: ok (taxa {info['fps_str']} constante, início e fim lidos sem erro)")
                 sample = min(45.0, info["duration"])
                 D.analyze_audio(jl, FFMPEG, path, str(out), 0.0, sample, info["has_audio"], s["a_lufs"] if s["a_loudnorm"] and s["mod_audio"] else None)
                 D.grab_frames(jl, FFMPEG, path, str(out), 0.0, info["duration"])
@@ -1172,7 +1215,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._err("A amostra não está mais disponível. Gere o teste de novo.")
                 return
             if os.name == "nt":
-                os.startfile(str(f))  # type: ignore[attr-defined]  # noqa: S606
+                if data.get("reveal"):     # abre a pasta com o arquivo já selecionado
+                    subprocess.Popen(f'explorer /select,"{f}"')  # noqa: S603,S607
+                else:
+                    os.startfile(str(f))  # type: ignore[attr-defined]  # noqa: S606
             self._json({"ok": True, "file": str(f)})
         elif route == "/api/open-output":
             if os.name == "nt":
